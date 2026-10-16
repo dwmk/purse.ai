@@ -1,0 +1,8 @@
+{
+  "name": "Purse Autonomous Finance",
+  "description": "Purse - Decentralized edge-computing personal finance copilot with smart budgeting, voice interaction, and long-term memory.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

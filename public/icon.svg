@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="purseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#B59DD1" />
+      <stop offset="35%" stop-color="#C794B0" />
+      <stop offset="70%" stop-color="#F3ACB4" />
+      <stop offset="100%" stop-color="#F9BBAE" />
+    </linearGradient>
+    <linearGradient id="handleGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8A7EA4" />
+      <stop offset="100%" stop-color="#B59DD1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#8A7EA4" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  
+  <!-- Outer Rounded Container -->
+  <rect width="512" height="512" rx="128" fill="#FDF9FB"/>
+  
+  <!-- Purse Handle Arc -->
+  <path d="M192 190 C192 120, 320 120, 320 190" fill="none" stroke="url(#handleGradient)" stroke-width="26" stroke-linecap="round"/>
+  
+  <!-- Main Purse Body -->
+  <path d="M112 210 Q256 180 400 210 L376 400 Q256 426 136 400 Z" fill="url(#purseGradient)" filter="url(#shadow)"/>
+  
+  <!-- Metallic Clasp -->
+  <circle cx="256" cy="235" r="22" fill="#FFFFFF" opacity="0.95"/>
+  <circle cx="256" cy="235" r="12" fill="#8A7EA4"/>
+  
+  <!-- Accent Stitching Lines -->
+  <path d="M150 250 Q256 268 362 250" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-dasharray="8 6" opacity="0.6"/>
+</svg>
