@@ -104,25 +104,25 @@ export const LandingPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F9BBAE] dark:bg-[#8A7EA4] text-[#8A7EA4] dark:text-[#F9BBAE] flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-[#F8F9FB] dark:bg-[#0A0910] text-[#18181B] dark:text-[#F4F4F5] flex flex-col font-sans transition-colors duration-200">
       
       {/* Hero Section */}
-      <section className="relative pt-12 pb-16 sm:pt-20 sm:pb-24 border-b border-[#C794B0] dark:border-[#B59DD1] overflow-hidden">
+      <section className="relative pt-12 pb-16 sm:pt-20 sm:pb-24 border-b border-zinc-200/80 dark:border-zinc-800/80 overflow-hidden">
         
         <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-8 text-center sm:text-left">
           
           {/* Eyebrow Pill */}
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-mono font-medium border border-[#8A7EA4] bg-[#F3ACB4] dark:bg-[#8A7EA4] text-[#8A7EA4] dark:text-[#F9BBAE] shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-[#8A7EA4] dark:bg-[#F9BBAE] animate-pulse" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-mono font-medium border border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300 shadow-xs">
+            <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
             <span>PURSE · AUTONOMOUS PRIVATE FINANCE COPILOT</span>
           </div>
 
           {/* Headline */}
           <div className="space-y-4 max-w-3xl">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[#8A7EA4] dark:text-[#F9BBAE] leading-[1.08] text-balance">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-[1.08] text-balance">
               Every Dollar In Order. Private In Your Pocket.
             </h1>
-            <p className="text-base sm:text-lg text-[#8A7EA4]/85 dark:text-[#F9BBAE]/85 max-w-2xl leading-relaxed">
+            <p className="text-base sm:text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed">
               Conversational bookkeeping, natural voice speech, smart envelope budgeting, and persistent memory reasoning stored completely in your browser.
             </p>
           </div>
@@ -132,7 +132,7 @@ export const LandingPage: React.FC = () => {
             
             <button
               onClick={() => setCurrentView('chat')}
-              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-xs sm:text-sm font-semibold text-[#F9BBAE] bg-[#8A7EA4] hover:bg-[#B59DD1] hover:text-[#8A7EA4] transition-all tactile-btn cursor-pointer shadow-lg"
+              className="flex items-center gap-2 px-7 py-3.5 rounded-2xl text-xs sm:text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-all tactile-btn cursor-pointer shadow-lg shadow-violet-500/20"
             >
               <Sparkles className="w-4 h-4" />
               <span>Launch Purse App</span>
@@ -143,7 +143,7 @@ export const LandingPage: React.FC = () => {
             {!isInstalled && (
               <button
                 onClick={handleInstallClick}
-                className="flex items-center gap-2 px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-mono font-semibold border border-[#8A7EA4] bg-[#F3ACB4] dark:bg-[#8A7EA4] text-[#8A7EA4] dark:text-[#F9BBAE] hover:bg-[#B59DD1] hover:text-[#8A7EA4] transition-all cursor-pointer shadow-xs"
+                className="flex items-center gap-2 px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-mono font-semibold border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all cursor-pointer shadow-xs"
               >
                 <Download className="w-4 h-4" />
                 <span>Install Purse on Device</span>
@@ -152,7 +152,7 @@ export const LandingPage: React.FC = () => {
 
             <button
               onClick={() => setCurrentView('overview')}
-              className="px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-medium border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] text-[#8A7EA4] dark:text-[#F9BBAE] hover:bg-[#B59DD1] hover:text-[#8A7EA4] transition-colors cursor-pointer"
+              className="px-5 py-3.5 rounded-2xl text-xs sm:text-sm font-medium border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors cursor-pointer"
             >
               <span>Explore Wallet Cockpit</span>
             </button>
@@ -161,21 +161,21 @@ export const LandingPage: React.FC = () => {
 
           {/* Interactive Bento Intent Simulator */}
           <div className="pt-6">
-            <div className="rounded-3xl border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] shadow-xl overflow-hidden text-left">
+            <div className="rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xl overflow-hidden text-left">
               
-              <div className="px-5 py-3.5 border-b border-[#C794B0] dark:border-[#B59DD1] flex items-center justify-between bg-[#B59DD1]/30">
+              <div className="px-5 py-3.5 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/60 dark:bg-zinc-900/60">
                 <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#8A7EA4]" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#C794B0]" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#B59DD1]" />
-                  <span className="font-mono text-xs text-[#8A7EA4] dark:text-[#F9BBAE] ml-2 font-bold">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                  <span className="font-mono text-xs text-zinc-800 dark:text-zinc-200 ml-2 font-bold">
                     Live Cognitive Simulator
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1.5 text-[11px] font-mono text-[#8A7EA4] dark:text-[#F9BBAE]">
-                    <Mic className="w-3 h-3" />
-                    <Volume2 className="w-3 h-3" />
+                  <span className="flex items-center gap-1.5 text-[11px] font-mono text-zinc-500 dark:text-zinc-400">
+                    <Mic className="w-3 h-3 text-violet-500" />
+                    <Volume2 className="w-3 h-3 text-violet-500" />
                     <span>Web Speech Enabled</span>
                   </span>
                 </div>
@@ -189,11 +189,11 @@ export const LandingPage: React.FC = () => {
                     onChange={e => setSimPrompt(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && runSimulation(simPrompt)}
                     placeholder="Try speaking or typing: e.g. 'Spent $64 at Trader Joe\'s'"
-                    className="flex-1 bg-[#F9BBAE] dark:bg-[#8A7EA4] border border-[#8A7EA4] px-4 py-3 rounded-xl text-xs sm:text-sm font-mono text-[#8A7EA4] dark:text-[#F9BBAE] placeholder-[#8A7EA4]/60 dark:placeholder-[#F9BBAE]/60 focus:outline-none"
+                    className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3 rounded-xl text-xs sm:text-sm font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-violet-500"
                   />
                   <button
                     onClick={() => runSimulation(simPrompt)}
-                    className="px-5 py-3 bg-[#8A7EA4] text-[#F9BBAE] hover:bg-[#B59DD1] hover:text-[#8A7EA4] rounded-xl text-xs font-mono font-semibold transition-all tactile-btn cursor-pointer shrink-0"
+                    className="px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-mono font-semibold transition-all tactile-btn cursor-pointer shrink-0 shadow-xs"
                   >
                     Simulate
                   </button>
@@ -204,7 +204,7 @@ export const LandingPage: React.FC = () => {
                     <button
                       key={p}
                       onClick={() => runSimulation(p)}
-                      className="text-[11px] font-mono px-3.5 py-1.5 rounded-full bg-[#B59DD1] text-[#8A7EA4] hover:bg-[#F9BBAE] border border-[#8A7EA4] transition-colors cursor-pointer font-medium"
+                      className="text-[11px] font-mono px-3.5 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-750 transition-colors cursor-pointer font-medium"
                     >
                       {p}
                     </button>
@@ -213,26 +213,26 @@ export const LandingPage: React.FC = () => {
               </div>
 
               {simOutput && (
-                <div className="px-5 sm:px-6 pb-6 pt-1 space-y-3 font-mono text-xs border-t border-[#C794B0] dark:border-[#B59DD1]">
-                  <div className="flex items-center justify-between text-[#8A7EA4] dark:text-[#F9BBAE] text-[11px] pt-3 font-bold">
+                <div className="px-5 sm:px-6 pb-6 pt-1 space-y-3 font-mono text-xs border-t border-zinc-200 dark:border-zinc-800">
+                  <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-[11px] pt-3 font-bold">
                     <span>RECOGNIZED INTENT:</span>
-                    <span className="font-bold text-[#8A7EA4] dark:text-[#F9BBAE]">{simOutput.intent}</span>
+                    <span className="font-bold text-violet-600 dark:text-violet-400">{simOutput.intent}</span>
                   </div>
 
                   <div className="space-y-1.5">
                     {simOutput.steps.map(s => (
-                      <div key={s.step} className="flex items-start gap-2 p-2.5 bg-[#F9BBAE] dark:bg-[#B59DD1] rounded-xl border border-[#C794B0] dark:border-[#8A7EA4]">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-[#8A7EA4] shrink-0 mt-0.5" />
+                      <div key={s.step} className="flex items-start gap-2 p-2.5 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200/80 dark:border-zinc-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                         <div>
-                          <span className="font-semibold text-[#8A7EA4]">0{s.step}. {s.title}: </span>
-                          <span className="text-[#8A7EA4]/85">{s.detail}</span>
+                          <span className="font-semibold text-zinc-800 dark:text-zinc-200">0{s.step}. {s.title}: </span>
+                          <span className="text-zinc-600 dark:text-zinc-400">{s.detail}</span>
                         </div>
                       </div>
                     ))}
                   </div>
 
                   {simOutput.measurableValue && (
-                    <div className="p-3 bg-[#B59DD1] border border-[#8A7EA4] rounded-xl text-[#8A7EA4] font-bold">
+                    <div className="p-3 bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 rounded-xl text-violet-900 dark:text-violet-200 font-bold">
                       MEASURABLE VALUE: {simOutput.measurableValue}
                     </div>
                   )}
@@ -249,38 +249,38 @@ export const LandingPage: React.FC = () => {
       <section className="py-16 max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           
-          <div className="p-6 rounded-3xl border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8A7EA4] text-[#F9BBAE] flex items-center justify-center font-bold">
-              <Mic className="w-5 h-5 text-[#F9BBAE]" />
+          <div className="p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xs space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-950/80 text-violet-600 dark:text-violet-400 flex items-center justify-center font-bold">
+              <Mic className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-[#8A7EA4] dark:text-[#F9BBAE]">
+            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
               Voice-First Natural Speech
             </h3>
-            <p className="text-xs text-[#8A7EA4]/80 dark:text-[#F9BBAE]/80 leading-relaxed font-sans">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
               Speak transactions into the mic or listen to the agent read answers aloud using modern Web Speech APIs with zero latency.
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8A7EA4] text-[#F9BBAE] flex items-center justify-center font-bold">
-              <Shield className="w-5 h-5 text-[#F9BBAE]" />
+          <div className="p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xs space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+              <Shield className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-[#8A7EA4] dark:text-[#F9BBAE]">
+            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
               Safe Non-Destructive Gates
             </h3>
-            <p className="text-xs text-[#8A7EA4]/80 dark:text-[#F9BBAE]/80 leading-relaxed font-sans">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
               The AI agent cannot silently change your records. Every transaction requires your approval and includes a 1-click Rollback.
             </p>
           </div>
 
-          <div className="p-6 rounded-3xl border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] shadow-xs space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-[#8A7EA4] text-[#F9BBAE] flex items-center justify-center font-bold">
-              <Cpu className="w-5 h-5 text-[#F9BBAE]" />
+          <div className="p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xs space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+              <Cpu className="w-5 h-5" />
             </div>
-            <h3 className="font-bold text-sm text-[#8A7EA4] dark:text-[#F9BBAE]">
+            <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
               Persistent Memory Core
             </h3>
-            <p className="text-xs text-[#8A7EA4]/80 dark:text-[#F9BBAE]/80 leading-relaxed font-sans">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
               Your financial invariants and habits persist in a compact Markdown knowledge file that you can inspect, edit, and export anytime.
             </p>
           </div>
@@ -290,23 +290,23 @@ export const LandingPage: React.FC = () => {
 
       {/* PWA iOS / Browser Guide Modal */}
       {showIOSModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#8A7EA4]/60 backdrop-blur-sm p-4">
-          <div className="bg-[#F3ACB4] dark:bg-[#8A7EA4] border border-[#C794B0] dark:border-[#B59DD1] w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-4 font-mono text-xs animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-2 border-b border-[#C794B0] dark:border-[#B59DD1]">
-              <div className="flex items-center gap-2 font-bold text-sm text-[#8A7EA4] dark:text-[#F9BBAE]">
-                <Smartphone className="w-4 h-4 text-[#8A7EA4] dark:text-[#F9BBAE]" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-[#121216] border border-zinc-200 dark:border-zinc-800 w-full max-w-sm p-6 rounded-3xl shadow-2xl space-y-4 font-mono text-xs animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-2 font-bold text-sm text-zinc-900 dark:text-zinc-100">
+                <Smartphone className="w-4 h-4 text-violet-600" />
                 <span>Install Purse App</span>
               </div>
-              <button onClick={() => setShowIOSModal(false)} className="text-[#8A7EA4] dark:text-[#F9BBAE] hover:opacity-75 cursor-pointer">
+              <button onClick={() => setShowIOSModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-[#8A7EA4] dark:text-[#F9BBAE] font-sans text-xs leading-relaxed">
+            <p className="text-zinc-600 dark:text-zinc-400 font-sans text-xs leading-relaxed">
               To install Purse on your device for quick access, offline resilience, and a native app experience:
             </p>
 
-            <div className="p-3 bg-[#F9BBAE] dark:bg-[#B59DD1] rounded-xl space-y-2 text-[11px] text-[#8A7EA4] border border-[#C794B0] dark:border-[#8A7EA4]">
+            <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl space-y-2 text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800">
               <div>1. Tap your browser&apos;s <strong>Share</strong> or <strong>Menu (⋮)</strong> button.</div>
               <div>2. Scroll down and select <strong>&quot;Add to Home Screen&quot;</strong> or <strong>&quot;Install App&quot;</strong>.</div>
               <div>3. Launch Purse directly from your phone or desktop home screen!</div>
@@ -314,7 +314,7 @@ export const LandingPage: React.FC = () => {
 
             <button
               onClick={() => setShowIOSModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#8A7EA4] text-[#F9BBAE] hover:bg-[#B59DD1] hover:text-[#8A7EA4] font-semibold cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-semibold cursor-pointer shadow-xs transition-colors"
             >
               Got it
             </button>
@@ -323,7 +323,7 @@ export const LandingPage: React.FC = () => {
       )}
 
       {/* Minimal Footer */}
-      <footer className="py-8 border-t border-[#C794B0] dark:border-[#B59DD1] text-center text-xs font-mono text-[#8A7EA4] dark:text-[#F9BBAE]">
+      <footer className="py-8 border-t border-zinc-200 dark:border-zinc-800 text-center text-xs font-mono text-zinc-400 dark:text-zinc-500">
         Purse · Autonomous AI Personal Finance Copilot
       </footer>
 

@@ -91,27 +91,27 @@
   /* Default Light Mode */
   html:not(.dark) {
     color-scheme: light;
-    background-color: #F9BBAE;
+    background-color: #FAF8F9;
     color: #8A7EA4;
   }
 
   /* Dark Mode */
   html.dark {
     color-scheme: dark;
-    background-color: #8A7EA4;
+    background-color: #16131A;
     color: #F9BBAE;
   }
 
   body {
     font-family: var(--font-sans);
     min-height: 100vh;
-    background-color: #F9BBAE;
+    background-color: #FAF8F9;
     color: #8A7EA4;
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   html.dark body {
-    background-color: #8A7EA4;
+    background-color: #16131A;
     color: #F9BBAE;
   }
 

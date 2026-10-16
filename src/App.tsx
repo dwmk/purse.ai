@@ -2,6 +2,8 @@ import React from 'react';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import { TopBar } from './components/layout/TopBar';
 import { BottomDock } from './components/layout/BottomDock';
+import { ConversationSidebar } from './components/layout/ConversationSidebar';
+import { FionaAvatar } from './components/avatar/FionaAvatar';
 import { LandingPage } from './components/landing/LandingPage';
 import { OverviewView } from './components/dashboard/OverviewView';
 import { AgentChatView } from './components/chat/AgentChatView';
@@ -39,28 +41,34 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F9BBAE] dark:bg-[#8A7EA4] text-[#8A7EA4] dark:text-[#F9BBAE] flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-[#F8F9FB] dark:bg-[#0A0910] text-[#18181B] dark:text-[#F4F4F5] flex flex-col font-sans transition-colors duration-200">
       <TopBar />
       
-      <main className="flex-1 w-full pb-14 sm:pb-8">
+      {/* Slide-out / Collapsible Conversation History Sidebar */}
+      <ConversationSidebar />
+      
+      <main className="flex-1 w-full pb-16 sm:pb-4">
         {renderView()}
       </main>
 
-      {/* Floating Luxury Bottom Dock on App Views */}
+      {/* 3D Fiona Avatar (Waist-height in 3D Chat view, or PIP in bottom-left corner behind floating navbar) */}
+      <FionaAvatar />
+
+      {/* Floating Bottom Dock on Mobile Views Only */}
       <BottomDock />
 
       {/* Floating Notification Toast */}
       {notification && (
-        <div className="fixed bottom-20 sm:bottom-6 right-4 z-50 max-w-sm w-full bg-[#8A7EA4] dark:bg-[#F3ACB4] text-[#F9BBAE] dark:text-[#8A7EA4] p-3 rounded-2xl border border-[#B59DD1] shadow-2xl flex items-center justify-between gap-3 font-mono text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
+        <div className="fixed bottom-20 sm:bottom-6 right-4 z-50 max-w-sm w-full bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 p-3 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl flex items-center justify-between gap-3 font-mono text-xs animate-in fade-in slide-in-from-bottom-2 duration-150">
           <div className="flex items-center gap-2.5">
-            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-[#F9BBAE] dark:text-[#8A7EA4] shrink-0" />}
-            {notification.type === 'error' && <AlertCircle className="w-4 h-4 text-[#F3ACB4] dark:text-[#8A7EA4] shrink-0" />}
-            {notification.type === 'info' && <Info className="w-4 h-4 text-[#B59DD1] dark:text-[#8A7EA4] shrink-0" />}
+            {notification.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />}
+            {notification.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />}
+            {notification.type === 'info' && <Info className="w-4 h-4 text-violet-500 shrink-0" />}
             <span className="leading-tight font-sans text-xs">{notification.message}</span>
           </div>
           <button
             onClick={clearNotification}
-            className="text-[#F9BBAE] dark:text-[#8A7EA4] hover:opacity-75 p-0.5 cursor-pointer shrink-0"
+            className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-0.5 cursor-pointer shrink-0"
           >
             <X className="w-3.5 h-3.5" />
           </button>

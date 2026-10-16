@@ -6,13 +6,14 @@ import {
   Bill,
   BudgetEnvelope,
   ChatMessage,
+  ConversationSession,
   LLMConfig,
   MemoryFile,
   Transaction
 } from '../types/finance';
 import { StorageService } from '../services/storage';
 import { processAgentMessage } from '../services/agentEngine';
-import { SpeechService } from '../services/speech';
+import { SpeechService, registerSubtitleListener, getFionaGreeting } from '../services/speech';
 
 interface FinanceContextType {
   accounts: Account[];
@@ -21,6 +22,19 @@ interface FinanceContextType {
   budgets: BudgetEnvelope[];
   memory: MemoryFile;
   chatMessages: ChatMessage[];
+  conversations: ConversationSession[];
+  activeConversationId: string;
+  setActiveConversationId: (id: string) => void;
+  createNewConversation: () => string;
+  deleteConversation: (id: string) => void;
+  isSidebarOpen: boolean;
+  setIsSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+  is3DMode: boolean;
+  setIs3DMode: (val: boolean) => void;
+  toggle3DMode: () => void;
+  activeSubtitle: string;
+  isAvatarSpeaking: boolean;
   actions: AgentAction[];
   config: LLMConfig;
   theme: 'dark' | 'light';
@@ -67,10 +81,84 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [bills, setBills] = useState<Bill[]>(() => StorageService.getBills());
   const [budgets, setBudgets] = useState<BudgetEnvelope[]>(() => StorageService.getBudgets());
   const [memory, setMemory] = useState<MemoryFile>(() => StorageService.getMemory());
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => StorageService.getChatHistory());
+  const [conversations, setConversations] = useState<ConversationSession[]>(() => StorageService.getConversations());
+  const [activeConversationId, setActiveConversationIdState] = useState<string>(() => StorageService.getActiveConversationId());
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [actions, setActions] = useState<AgentAction[]>(() => StorageService.getActions());
   const [config, setConfig] = useState<LLMConfig>(() => StorageService.getConfig());
   const [theme, setTheme] = useState<'dark' | 'light'>(() => StorageService.getTheme());
+
+  // Resolved active conversation & its messages
+  const activeConversation = conversations.find(c => c.id === activeConversationId) || conversations[0] || {
+    id: 'conv_default',
+    title: 'New Conversation',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: []
+  };
+
+  const chatMessages = activeConversation.messages;
+
+  const setActiveConversationId = (id: string) => {
+    setActiveConversationIdState(id);
+    StorageService.saveActiveConversationId(id);
+  };
+
+  const createNewConversation = (): string => {
+    const newId = `conv_${Date.now()}`;
+    const newConv: ConversationSession = {
+      id: newId,
+      title: 'New Conversation',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      messages: [
+        {
+          id: `msg_welcome_${Date.now()}`,
+          sender: 'agent',
+          content: 'Hello! I am **Purse**, your personal AI finance assistant. I operate privately in your browser storage with zero cloud tracking. What would you like to log or review today?',
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+    const updated = [newConv, ...conversations];
+    setConversations(updated);
+    StorageService.saveConversations(updated);
+    setActiveConversationId(newId);
+    return newId;
+  };
+
+  const deleteConversation = (id: string) => {
+    const updated = conversations.filter(c => c.id !== id);
+    if (updated.length === 0) {
+      const fallback: ConversationSession = {
+        id: `conv_${Date.now()}`,
+        title: 'New Conversation',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages: [
+          {
+            id: `msg_welcome_${Date.now()}`,
+            sender: 'agent',
+            content: 'Hello! I am **Purse**, your personal AI finance assistant. What would you like to log or review today?',
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+      setConversations([fallback]);
+      StorageService.saveConversations([fallback]);
+      setActiveConversationId(fallback.id);
+    } else {
+      setConversations(updated);
+      StorageService.saveConversations(updated);
+      if (activeConversationId === id) {
+        setActiveConversationId(updated[0].id);
+      }
+    }
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarOpen(prev => !prev);
+  };
   
   // Storage Usage State
   const [storageUsage, setStorageUsage] = useState(() => StorageService.getStorageUsage());
@@ -100,17 +188,79 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isGenerating, setIsGenerating] = useState(false);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  // Sync theme with HTML document
+  // 3D Mode & Subtitle states
+  const [is3DMode, setIs3DModeState] = useState<boolean>(() => {
+    return localStorage.getItem('purse_3d_mode') !== 'false';
+  });
+  const [activeSubtitle, setActiveSubtitle] = useState<string>('');
+  const [isAvatarSpeaking, setIsAvatarSpeaking] = useState<boolean>(false);
+  const hasGreetedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    const unregister = registerSubtitleListener((text, speaking) => {
+      setActiveSubtitle(text);
+      setIsAvatarSpeaking(speaking);
+    });
+    return unregister;
+  }, []);
+
+  const toggle3DMode = () => {
+    setIs3DModeState(prev => {
+      const next = !prev;
+      localStorage.setItem('purse_3d_mode', String(next));
+      return next;
+    });
+  };
+
+  const setIs3DMode = (val: boolean) => {
+    setIs3DModeState(val);
+    localStorage.setItem('purse_3d_mode', String(val));
+  };
+
+  // Fiona Audio Greeting on entry (first time or time-of-day greeting)
+  useEffect(() => {
+    if (hasGreetedRef.current || !isSpeechEnabled) return;
+
+    const playGreeting = () => {
+      if (hasGreetedRef.current) return;
+      hasGreetedRef.current = true;
+      const greeting = getFionaGreeting();
+      SpeechService.speak(greeting, undefined, undefined, false);
+    };
+
+    const onUserInteraction = () => {
+      playGreeting();
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+    };
+
+    window.addEventListener('pointerdown', onUserInteraction, { once: true });
+    window.addEventListener('keydown', onUserInteraction, { once: true });
+
+    const timer = setTimeout(() => {
+      if (!hasGreetedRef.current) {
+        playGreeting();
+      }
+    }, 1500);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointerdown', onUserInteraction);
+      window.removeEventListener('keydown', onUserInteraction);
+    };
+  }, [isSpeechEnabled]);
+
+  // Sync theme with HTML document - Light theme is near-white (#F8F9FB), Dark theme is deep obsidian (#0A0910)
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
       root.classList.add('dark');
       document.body.classList.add('dark');
-      document.body.style.backgroundColor = '#8A7EA4';
+      document.body.style.backgroundColor = '#0A0910';
     } else {
       root.classList.remove('dark');
       document.body.classList.remove('dark');
-      document.body.style.backgroundColor = '#F9BBAE';
+      document.body.style.backgroundColor = '#F8F9FB';
     }
     StorageService.saveTheme(theme);
   }, [theme]);
@@ -174,11 +324,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (next === 'dark') {
         root.classList.add('dark');
         document.body.classList.add('dark');
-        document.body.style.backgroundColor = '#8A7EA4';
+        document.body.style.backgroundColor = '#0A0910';
       } else {
         root.classList.remove('dark');
         document.body.classList.remove('dark');
-        document.body.style.backgroundColor = '#F9BBAE';
+        document.body.style.backgroundColor = '#F8F9FB';
       }
       StorageService.saveTheme(next);
       return next;
@@ -263,9 +413,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     StorageService.saveActions(updatedActions);
     refreshStorageUsage();
 
-    setChatMessages(prev =>
-      prev.map(msg => (msg.action?.id === actionId ? { ...msg, action: { ...msg.action, status: 'applied' } } : msg))
-    );
+    setConversations(prev => {
+      const next = prev.map(c => ({
+        ...c,
+        messages: c.messages.map(msg =>
+          msg.action?.id === actionId && msg.action ? { ...msg, action: { ...msg.action, status: 'applied' as const } } : msg
+        )
+      }));
+      StorageService.saveConversations(next);
+      return next;
+    });
   };
 
   const rejectAction = (actionId: string) => {
@@ -273,9 +430,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setActions(updatedActions);
     StorageService.saveActions(updatedActions);
 
-    setChatMessages(prev =>
-      prev.map(msg => (msg.action?.id === actionId ? { ...msg, action: { ...msg.action, status: 'rejected' } } : msg))
-    );
+    setConversations(prev => {
+      const next = prev.map(c => ({
+        ...c,
+        messages: c.messages.map(msg =>
+          msg.action?.id === actionId && msg.action ? { ...msg, action: { ...msg.action, status: 'rejected' as const } } : msg
+        )
+      }));
+      StorageService.saveConversations(next);
+      return next;
+    });
     showNotification('info', 'Action rejected and dismissed safely.');
   };
 
@@ -310,6 +474,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updatedActions = actions.map(a => (a.id === actionId ? { ...a, status: 'reverted' as const } : a));
     setActions(updatedActions);
     StorageService.saveActions(updatedActions);
+
+    setConversations(prev => {
+      const next = prev.map(c => ({
+        ...c,
+        messages: c.messages.map(msg =>
+          msg.action?.id === actionId && msg.action ? { ...msg, action: { ...msg.action, status: 'reverted' as const } } : msg
+        )
+      }));
+      StorageService.saveConversations(next);
+      return next;
+    });
     refreshStorageUsage();
   };
 
@@ -324,8 +499,23 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       timestamp: new Date().toISOString()
     };
 
-    const newChatList = [...chatMessages, userMsg];
-    setChatMessages(newChatList);
+    const targetConv = conversations.find(c => c.id === activeConversationId) || activeConversation;
+    const isGenericTitle = targetConv.title === 'New Conversation' || targetConv.title === 'Welcome & Onboarding';
+    const newTitle = isGenericTitle
+      ? (userInput.length > 34 ? userInput.slice(0, 32).trim() + '...' : userInput.trim())
+      : targetConv.title;
+
+    const newChatList = [...targetConv.messages, userMsg];
+    const updatedConvStage1: ConversationSession = {
+      ...targetConv,
+      title: newTitle,
+      updatedAt: new Date().toISOString(),
+      messages: newChatList
+    };
+
+    const stage1Conversations = conversations.map(c => c.id === targetConv.id ? updatedConvStage1 : c);
+    setConversations(stage1Conversations);
+    StorageService.saveConversations(stage1Conversations);
     StorageService.saveChatHistory(newChatList);
     setIsGenerating(true);
 
@@ -368,7 +558,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       };
 
       const finalChat = [...newChatList, agentMsg];
-      setChatMessages(finalChat);
+      const updatedConvStage2: ConversationSession = {
+        ...updatedConvStage1,
+        updatedAt: new Date().toISOString(),
+        messages: finalChat
+      };
+
+      setConversations(prev => {
+        const next = prev.map(c => c.id === targetConv.id ? updatedConvStage2 : c);
+        StorageService.saveConversations(next);
+        return next;
+      });
       StorageService.saveChatHistory(finalChat);
       refreshStorageUsage();
 
@@ -383,7 +583,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         timestamp: new Date().toISOString()
       };
       const finalChat = [...newChatList, errorMsg];
-      setChatMessages(finalChat);
+      const updatedConvErr: ConversationSession = {
+        ...updatedConvStage1,
+        updatedAt: new Date().toISOString(),
+        messages: finalChat
+      };
+      setConversations(prev => {
+        const next = prev.map(c => c.id === targetConv.id ? updatedConvErr : c);
+        StorageService.saveConversations(next);
+        return next;
+      });
       StorageService.saveChatHistory(finalChat);
     } finally {
       setIsGenerating(false);
@@ -505,6 +714,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setBills(StorageService.getBills());
       setBudgets(StorageService.getBudgets());
       setMemory(StorageService.getMemory());
+      setConversations(StorageService.getConversations());
+      setActiveConversationIdState(StorageService.getActiveConversationId());
       setActions(StorageService.getActions());
       refreshStorageUsage();
       showNotification('success', result.message);
@@ -533,6 +744,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBills(StorageService.getBills());
     setBudgets(StorageService.getBudgets());
     setMemory(StorageService.getMemory());
+    setConversations(StorageService.getConversations());
+    setActiveConversationIdState(StorageService.getActiveConversationId());
     setActions([]);
     refreshStorageUsage();
     showNotification('info', 'Reset all records to authentic seed dataset.');
@@ -547,7 +760,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBills([]);
     setBudgets([]);
     setActions([]);
-    setChatMessages([]);
+    setConversations([]);
     setMemory(StorageService.getMemory());
     refreshStorageUsage();
     showNotification('info', 'All browser storage has been completely erased.');
@@ -562,6 +775,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         budgets,
         memory,
         chatMessages,
+        conversations,
+        activeConversationId,
+        setActiveConversationId,
+        createNewConversation,
+        deleteConversation,
+        isSidebarOpen,
+        setIsSidebarOpen,
+        toggleSidebar,
+        is3DMode,
+        setIs3DMode,
+        toggle3DMode,
+        activeSubtitle,
+        isAvatarSpeaking,
         actions,
         config,
         theme,

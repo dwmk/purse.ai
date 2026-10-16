@@ -120,6 +120,14 @@ export interface ChatMessage {
   memoryUpdateNote?: string;
 }
 
+export interface ConversationSession {
+  id: string;
+  title: string;
+  createdAt: string; // ISO string
+  updatedAt: string;
+  messages: ChatMessage[];
+}
+
 export interface UserFinancialProfile {
   monthlyIncome: number;
   paydayCadence: 'bi-weekly' | 'monthly' | 'semi-monthly';
