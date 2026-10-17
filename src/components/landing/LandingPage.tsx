@@ -107,7 +107,6 @@ export const LandingPage: React.FC = () => {
   }, []);
 
   return (
-    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
     <div className="purse-landing">
       <style>{`
         
