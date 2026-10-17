@@ -18,6 +18,7 @@ import { processAgentMessage } from '../services/agentEngine';
 import { SpeechService, registerSubtitleListener, getFionaGreeting } from '../services/speech';
 import { OrganizedIngestionResult } from '../services/ingestion';
 import { vectorDb } from '../services/vectorDb';
+import { BrowserLMService } from '../services/browserLm';
 
 interface FinanceContextType {
   accounts: Account[];
@@ -238,6 +239,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIs3DModeState(val);
     localStorage.setItem('purse_3d_mode', String(val));
   };
+
+  // Automatically download and preload the browser-based AI LLM when opening /app if not found nor preloaded
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isApp = currentView !== 'landing' || window.location.pathname.startsWith('/app');
+    if (!isApp) return;
+
+    BrowserLMService.ensurePreloadedOrDownload();
+  }, [currentView]);
 
   // Fiona Audio Greeting on entry (only occurs once a user enters /app)
   useEffect(() => {

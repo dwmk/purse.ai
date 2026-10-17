@@ -161,3 +161,12 @@ export interface LLMConfig {
 }
 
 export type AppView = 'landing' | 'overview' | 'chat' | 'ledger' | 'budgets' | 'bills' | 'memory' | 'settings';
+
+export interface AgentContext {
+  accounts: Account[];
+  transactions: Transaction[];
+  bills: Bill[];
+  budgets: BudgetEnvelope[];
+  memory: MemoryFile;
+  config: LLMConfig;
+}

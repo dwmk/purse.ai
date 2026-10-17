@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { BrowserLMService, BrowserLMStatus } from '../../services/browserLm';
 import {
   Sun,
   Moon,
@@ -8,7 +9,9 @@ import {
   Settings,
   ArrowRight,
   PanelLeft,
-  Box
+  Box,
+  Loader2,
+  Cpu
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -24,6 +27,12 @@ export const TopBar: React.FC = () => {
     toggle3DMode,
     toggleSidebar
   } = useFinance();
+
+  const [lmStatus, setLmStatus] = useState<BrowserLMStatus>(() => BrowserLMService.getStatus());
+
+  useEffect(() => {
+    return BrowserLMService.subscribe(st => setLmStatus(st));
+  }, []);
 
   const isLanding = currentView === 'landing';
 
@@ -170,6 +179,25 @@ export const TopBar: React.FC = () => {
           </div>
         ) : (
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Browser Edge AI Model Status Indicator */}
+            {lmStatus.status === 'downloading' || lmStatus.status === 'caching' ? (
+              <div
+                className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-900/60 text-[11px] font-mono text-violet-700 dark:text-violet-300"
+                title={lmStatus.message}
+              >
+                <Loader2 className="w-3 h-3 animate-spin text-violet-600 shrink-0" />
+                <span className="truncate max-w-[140px]">Downloading AI: {lmStatus.progress}%</span>
+              </div>
+            ) : lmStatus.isCached ? (
+              <div
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-[11px] font-mono text-emerald-700 dark:text-emerald-300"
+                title="SmolLM2-135M neural weights preloaded in browser memory"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Edge AI Preloaded</span>
+              </div>
+            ) : null}
+
             {/* 3D / 2D Avatar Toggle Button */}
             <button
               onClick={toggle3DMode}

@@ -10,6 +10,7 @@ import {
   Transaction
 } from '../types/finance';
 import { vectorDb } from './vectorDb';
+import { isWindowAIAvailable, runWindowAI, runBrowserEngine } from './browserLm';
 
 export interface AgentContext {
   accounts: Account[];
@@ -782,7 +783,6 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
   // If local edge engine (Chrome Prompt API / Transformers.js) is explicitly active, try it first
   if (config.provider === 'edge') {
     try {
-      const { isWindowAIAvailable, runWindowAI, runBrowserEngine } = await import('./browserLm');
       if (isWindowAIAvailable()) {
         try {
           const winAiReply = await runWindowAI(userInput, systemPrompt, onChunk);

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useFinance } from '../../context/FinanceContext';
 import { IngestionService, OrganizedIngestionResult } from '../../services/ingestion';
 import { BrowserLMService } from '../../services/browserLm';
@@ -74,6 +74,14 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    return BrowserLMService.subscribe(st => {
+      setBrowserLmProgress(st.progress);
+      setBrowserLmMsg(st.message);
+      setIsBrowserLmDownloading(st.status === 'downloading' || st.status === 'caching');
+    });
+  }, []);
+
   if (!isOpen) return null;
 
   const currentProviderInfo = MODEL_OPTIONS.find(p => p.id === selectedProvider) || MODEL_OPTIONS[0];
@@ -94,17 +102,7 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
   const handleProviderSelect = (prov: LLMProvider) => {
     setSelectedProvider(prov);
     if (prov === 'edge') {
-      if (!BrowserLMService.checkIfCached()) {
-        setIsBrowserLmDownloading(true);
-        BrowserLMService.subscribe(st => {
-          setBrowserLmProgress(st.progress);
-          setBrowserLmMsg(st.message);
-          if (st.status === 'ready') {
-            setIsBrowserLmDownloading(false);
-          }
-        });
-        BrowserLMService.startDownload();
-      }
+      BrowserLMService.ensurePreloadedOrDownload();
     }
   };
 

@@ -1,5 +1,5 @@
 // Browser-based Local LM Service: Real Hugging Face Transformers.js Integration, Window AI & Fast Preloading
-import { AgentContext, detectCategory, extractAmount, isIncomeIntent, runEdgeCognition } from './agentEngine';
+import { AgentContext } from '../types/finance';
 
 export interface BrowserLMStatus {
   status: 'idle' | 'downloading' | 'caching' | 'ready' | 'error';
@@ -98,7 +98,19 @@ export async function loadTransformersModel(): Promise<any> {
   });
 
   try {
-    const { pipeline, env } = await import('@huggingface/transformers');
+    let transformersModule: any;
+    try {
+      transformersModule = await import('@huggingface/transformers');
+    } catch (importErr: any) {
+      console.warn('Dynamic import of @huggingface/transformers failed:', importErr);
+      BrowserLMService.notify({
+        status: 'error',
+        message: `Loading Transformers engine failed (${importErr?.message || 'Network error'}). Retrying...`
+      });
+      throw importErr;
+    }
+
+    const { pipeline, env } = transformersModule;
     env.allowLocalModels = false;
     env.useBrowserCache = true;
 
@@ -262,6 +274,27 @@ class BrowserLMManager {
     });
   }
 
+  public isReady(): boolean {
+    return Boolean(transformersPipeline) || (this.currentStatus.status === 'ready' && Boolean(transformersPipeline));
+  }
+
+  public isLoading(): boolean {
+    return isPipelineLoading || this.currentStatus.status === 'downloading' || this.currentStatus.status === 'caching';
+  }
+
+  // Automatically download and preload the browser-based AI LLM if not found nor preloaded
+  public async ensurePreloadedOrDownload(): Promise<void> {
+    if (transformersPipeline || isPipelineLoading || this.isLoading()) {
+      return;
+    }
+
+    if (this.checkIfCached()) {
+      await this.preloadFromCache();
+    } else {
+      await this.startDownload();
+    }
+  }
+
   // Fast preload from cache
   public async preloadFromCache(): Promise<boolean> {
     if (!this.checkIfCached()) {
@@ -284,7 +317,7 @@ class BrowserLMManager {
 
   // Start downloading the real Hugging Face model weights via Transformers.js
   public async startDownload(): Promise<void> {
-    if (this.currentStatus.status === 'downloading') return;
+    if (this.currentStatus.status === 'downloading' || isPipelineLoading) return;
 
     try {
       await loadTransformersModel();

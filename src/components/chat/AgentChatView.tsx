@@ -89,6 +89,17 @@ export const AgentChatView: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Subscribe to BrowserLMService status updates and ensure model is preloaded or downloading
+  useEffect(() => {
+    const unsub = BrowserLMService.subscribe((st) => {
+      setBrowserLmProgress(st.progress);
+      setBrowserLmMsg(st.message);
+      setIsBrowserLmDownloading(st.status === 'downloading' || st.status === 'caching');
+    });
+    BrowserLMService.ensurePreloadedOrDownload();
+    return unsub;
+  }, []);
+
   // Stop listening helper
   const stopListening = () => {
     isListeningRef.current = false;
@@ -304,16 +315,8 @@ export const AgentChatView: React.FC = () => {
     updateConfig({ provider: opt.id, model: opt.model });
     setShowModelMenu(false);
 
-    if (opt.id === 'edge' && !BrowserLMService.checkIfCached()) {
-      setIsBrowserLmDownloading(true);
-      BrowserLMService.subscribe(st => {
-        setBrowserLmProgress(st.progress);
-        setBrowserLmMsg(st.message);
-        if (st.status === 'ready') {
-          setIsBrowserLmDownloading(false);
-        }
-      });
-      BrowserLMService.startDownload();
+    if (opt.id === 'edge') {
+      BrowserLMService.ensurePreloadedOrDownload();
     }
   };
 
