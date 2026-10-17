@@ -137,14 +137,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       title: 'New Conversation',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      messages: [
-        {
-          id: `msg_welcome_${Date.now()}`,
-          sender: 'agent',
-          content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
-          timestamp: new Date().toISOString()
-        }
-      ]
+      messages: []
     };
     const updated = [newConv, ...conversations];
     setConversations(updated);
@@ -161,14 +154,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         title: 'New Conversation',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messages: [
-          {
-            id: `msg_welcome_${Date.now()}`,
-            sender: 'agent',
-            content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
-            timestamp: new Date().toISOString()
-          }
-        ]
+        messages: []
       };
       setConversations([fallback]);
       StorageService.saveConversations([fallback]);
@@ -252,9 +238,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem('purse_3d_mode', String(val));
   };
 
-  // Fiona Audio Greeting on entry (first time or time-of-day greeting)
+  // Fiona Audio Greeting on entry (only occurs once a user enters /app)
   useEffect(() => {
-    if (hasGreetedRef.current || !isSpeechEnabled) return;
+    if (currentView === 'landing' || hasGreetedRef.current || !isSpeechEnabled) return;
 
     const playGreeting = () => {
       if (hasGreetedRef.current) return;
@@ -276,14 +262,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!hasGreetedRef.current) {
         playGreeting();
       }
-    }, 1500);
+    }, 1200);
 
     return () => {
       clearTimeout(timer);
       window.removeEventListener('pointerdown', onUserInteraction);
       window.removeEventListener('keydown', onUserInteraction);
     };
-  }, [isSpeechEnabled]);
+  }, [currentView, isSpeechEnabled]);
 
   // Sync theme with HTML document - Light theme is near-white (#F8F9FB), Dark theme is deep obsidian (#0A0910)
   useEffect(() => {
@@ -821,7 +807,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setMemory(newMemory);
     StorageService.saveMemory(newMemory);
     refreshStorageUsage();
-    showNotification('success', `Memory core updated (Revision #${newMemory.revisionCount})`);
+    showNotification('success', `Memory updated (Revision #${newMemory.revisionCount})`);
   };
 
   const updateConfig = (newConfig: Partial<LLMConfig>) => {

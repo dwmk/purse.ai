@@ -46,7 +46,7 @@ export const MemoryCoreView: React.FC = () => {
             Persistent Knowledge Graph
           </span>
           <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            Memory Core
+            Memory
           </h1>
         </div>
 

@@ -32,9 +32,16 @@ export default defineConfig(() => {
             }
           ]
         },
+        workbox: {
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [
+            /^\/api/,
+            /\.[a-zA-Z0-9]{1,10}$/,
+            /^\/public\//
+          ]
+        },
         devOptions: {
-          enabled: true,
-          type: 'module'
+          enabled: false
         }
       })
     ],

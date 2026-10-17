@@ -71,12 +71,12 @@ export function extractAmount(text: string): number | null {
   if (match) return parseFloat(match[1]);
   const numMatch = text.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\s*(?:dollars|bucks|usd)\b/i);
   if (numMatch) return parseFloat(numMatch[1]);
-  const standaloneMatch = text.match(/(?:spent|paid|cost|add|bought|received|earn|income|log)\s+([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const standaloneMatch = text.match(/(?:spent|paid|cost|add|bought|received|receive|earn|earned|income|log|gain|gained|gaining|made|deposited|deposit|sold)\s+([0-9]+(?:\.[0-9]{1,2})?)/i);
   if (standaloneMatch) return parseFloat(standaloneMatch[1]);
   return null;
 }
 
-// Cognitive Edge Rule Engine
+// Cognitive Edge Rule Engine for Action Extraction & Intent Parsing
 export function runEdgeCognition(userInput: string, context: AgentContext): AgentResponse {
   const text = userInput.trim();
   const lower = text.toLowerCase();
@@ -87,20 +87,6 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
   const totalLiquid = accounts
     .filter(a => a.type === 'checking' || a.type === 'savings')
     .reduce((sum, a) => sum + a.balance, 0);
-
-  // 1. CASUAL GREETING & GENERAL TALK (Friendly Personal Secretary response)
-  if (
-    lower.match(/^(hi|hello|hey|howdy|yo|greetings|good morning|good afternoon|good evening)\b/) ||
-    lower === 'hi' ||
-    lower === 'hello' ||
-    lower === 'hey' ||
-    lower.includes('how are you') ||
-    lower.includes('who are you')
-  ) {
-    return {
-      content: `Hey there! Good to see you. I'm keeping tabs on your accounts and bills right here in your browser. How can I help you today? Need to log an expense, check if you have room for a treat, or plan your savings goals?`
-    };
-  }
 
   // 2. INTENT: CASH RUNWAY QUERY
   if (lower.includes('runway') || lower.includes('how long can i survive') || lower.includes('survival')) {
@@ -194,18 +180,34 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 
   // 4. INTENT: LOG TRANSACTION (Conversational Bookkeeping)
   const amt = extractAmount(text);
-  const isIncome = lower.includes('income') || lower.includes('received') || lower.includes('earned') || lower.includes('salary') || lower.includes('paycheck');
-  const isTransaction = amt !== null || lower.includes('spent') || lower.includes('paid') || lower.includes('bought') || lower.includes('cost');
+  const incomeRegex = /\b(gain|gained|gaining|gains|income|received|receive|receives|got|get|gets|earn|earned|earning|earns|salary|paycheck|deposit|deposited|depositing|deposits|sold|sell|selling|dividend|dividends|refund|refunded|refunds|reimbursement|reimbursed|cashback|bonus|profit|profits|made|win|won|credit|credited|credits)\b|paid\s+me|gave\s+me|sent\s+me|incoming\b/i;
+  const isIncome = incomeRegex.test(lower);
+  const isTransaction = amt !== null || lower.includes('spent') || lower.includes('paid') || lower.includes('bought') || lower.includes('cost') || isIncome;
 
   if (isTransaction && amt !== null) {
-    const category = detectCategory(text);
-    // Merchant extraction
-    let merchant = 'Unknown Merchant';
-    const atMatch = text.match(/(?:at|from|to|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|for|on|\$|[0-9]|\.|$))/i);
-    if (atMatch && atMatch[1].trim().length > 1) {
-      merchant = atMatch[1].trim();
+    const category = isIncome ? 'Savings & Investments' : detectCategory(text);
+    // Merchant / Source extraction
+    let merchant = isIncome ? 'Direct Deposit / Payer' : 'Unknown Merchant';
+    if (isIncome) {
+      const fromMatch = text.match(/(?:from|by|via|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|on|\$|[0-9]|\.|$))/i);
+      if (fromMatch && fromMatch[1].trim().length > 1) {
+        merchant = fromMatch[1].trim();
+      } else if (lower.includes('salary') || lower.includes('paycheck')) {
+        merchant = 'Employer Payroll';
+      } else if (lower.includes('freelance') || lower.includes('client')) {
+        merchant = 'Client Invoice';
+      } else if (lower.includes('dividend')) {
+        merchant = 'Investment Dividend';
+      } else if (lower.includes('refund')) {
+        merchant = 'Merchant Refund';
+      }
     } else {
-      merchant = category === 'Groceries' ? 'Grocery Store' : category === 'Dining & Nightlife' ? 'Dining Venue' : 'Retail Merchant';
+      const atMatch = text.match(/(?:at|to|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|for|on|\$|[0-9]|\.|$))/i);
+      if (atMatch && atMatch[1].trim().length > 1) {
+        merchant = atMatch[1].trim();
+      } else {
+        merchant = category === 'Groceries' ? 'Grocery Store' : category === 'Dining & Nightlife' ? 'Dining Venue' : 'Retail Merchant';
+      }
     }
 
     const newTx: Transaction = {
@@ -230,7 +232,7 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
       id: `act_${Date.now()}`,
       timestamp: new Date().toISOString(),
       type: 'ADD_TRANSACTION',
-      description: `Log ${isIncome ? 'income' : 'expense'} of $${amt.toFixed(2)} at ${merchant} (${category})`,
+      description: `Log ${isIncome ? 'income' : 'expense'} of $${amt.toFixed(2)} ${isIncome ? 'from' : 'at'} ${merchant} (${category})`,
       payload: newTx,
       status: 'pending',
       safetyLevel: amt > 250 ? 'medium_risk' : 'low_risk',
@@ -350,7 +352,7 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
         id: `act_mem_${Date.now()}`,
         timestamp: new Date().toISOString(),
         type: 'UPDATE_MEMORY',
-        description: `Append new operational rule to Agent Memory Core: "${newRule}"`,
+        description: `Append new operational rule to Agent Memory: "${newRule}"`,
         payload: updatedMem,
         status: 'pending',
         safetyLevel: 'low_risk',
@@ -362,7 +364,7 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
         measurableValue: 'Memory Graph Updated with 1 Invariant',
         plan: {
           id: `plan_mem_${Date.now()}`,
-          intent: 'MEMORY_CORE_UPDATE',
+          intent: 'MEMORY_UPDATE',
           confidence: 0.98,
           reasoning: 'Parsed user financial rule and updated markdown memory graph.',
           steps: [
@@ -415,17 +417,7 @@ export async function processAgentMessage(
     console.warn('[VectorDB] Sync notice:', syncErr);
   }
 
-  // Only use edge rule engine if user explicitly chose local edge engine
-  if (config.provider === 'edge') {
-    try {
-      return runEdgeCognition(userInput, context);
-    } catch (e) {
-      console.warn('Edge cognition fallback error:', e);
-      return runEdgeCognition(userInput, context);
-    }
-  }
-
-  // Use AI Agent (Gemini, OpenAI, DeepSeek, Z.ai) via full-stack server
+  // Always invoke LLM via server-side reasoning endpoint (Gemini, OpenAI, DeepSeek, Z.ai)
   try {
     // 1. Retrieve top semantically relevant chunks from local browser vector database
     const ragContext = vectorDb.buildRagContext(userInput, 4);
@@ -443,7 +435,7 @@ ARCHITECTURE & MEMORY RETRIEVAL (Browser-Native Vector RAG):
 
 ${ragContext || '[No specific historical vector chunks matched]'}
 
-ACTIVE AGENT KNOWLEDGE GRAPH (Memory Core):
+ACTIVE AGENT KNOWLEDGE GRAPH (Memory):
 ${memory.rawMarkdown}
 
 QUICK LEDGER SNAPSHOT:
@@ -460,14 +452,15 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 
 2. NEVER DUMP UNSOLICITED BUSINESS REPORTS OR BULLETED SUMMARIES:
    - For simple greetings, small talk, casual questions ("hey", "how are you?", "can I grab a coffee?"), reply in 1 to 3 friendly, direct, natural sentences.
-   - Do NOT produce full financial summaries, multi-bullet status reports, or executive overviews UNLESS the user explicitly asks for them (e.g. "give me a full breakdown", "run an audit", "summarize my finances", "prepare a report").
-   - When asked a specific question like "Can I afford dinner tonight?", answer conversationally with direct numbers (e.g. "Yes, totally! You've got $120 left in your dining envelope this week, so a $40 dinner is well within your safe zone.") instead of generating a 5-part corporate dossier.
+   - Do NOT produce full financial summaries, multi-bullet status reports, or executive overviews UNLESS the user explicitly asks for them.
+   - When asked a specific question like "Can I afford dinner tonight?", answer conversationally with direct numbers (e.g. "Yes, totally! You've got $120 left in your dining envelope this week, so a $40 dinner is well within your safe zone.").
 
-3. SMART BOOKKEEPING & RULES:
+3. SMART BOOKKEEPING & ACTIONS:
    - If the user mentions spending or receiving money (e.g. "Spent $15 at Starbucks"), acknowledge it warmly and confirm it's tracked against their envelope.
    - If the user shares a rule or personal goal ("Remember that I want to save $300 for a trip"), warmly confirm that you've noted it in their persistent memory.`;
 
-    const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash')
+    const effectiveProvider = (!config.provider || config.provider === 'edge') ? 'gemini' : config.provider;
+    const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash' || config.model === 'smolLM2-360M-instruct')
       ? 'gemini-3.8-flash'
       : config.model;
 
@@ -475,7 +468,7 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        provider: config.provider || 'gemini',
+        provider: effectiveProvider,
         apiKey: config.apiKey,
         model: effectiveModel,
         messages: [{ role: 'user', content: userInput }],
@@ -483,23 +476,26 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       })
     });
 
+    // Check if user input triggered a concrete ledger action (e.g. logging a transaction)
+    const edgePlan = runEdgeCognition(userInput, context);
+    const hasConcreteAction = Boolean(edgePlan.action);
+
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      console.warn(`Server LLM error (${res.status}):`, errData);
-      if (config.useEdgeFallback) {
-        return runEdgeCognition(userInput, context);
-      }
+      const errDetail = errData.error || `${res.status} ${res.statusText}`;
+      // All messages must be from LLM, return actual error with no fake mock replies
       return {
-        content: `I ran into a temporary issue connecting to the AI agent (${errData.error || res.statusText}). Feel free to ask me again or switch to local edge mode in settings!`,
+        content: `LLM Service Notice: ${errDetail}. Please check your connection or LLM settings.`,
+        plan: hasConcreteAction ? edgePlan.plan : undefined,
+        action: edgePlan.action,
+        measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
+        memoryNote: edgePlan.memoryNote,
+        updatedMemory: edgePlan.updatedMemory
       };
     }
 
     const data = await res.json();
     const reply = data.reply || '';
-
-    // Check if user input also triggered a concrete ledger action (e.g. logging a transaction)
-    const edgePlan = runEdgeCognition(userInput, context);
-    const hasConcreteAction = Boolean(edgePlan.action);
 
     return {
       content: reply,
@@ -509,13 +505,18 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       memoryNote: edgePlan.memoryNote,
       updatedMemory: edgePlan.updatedMemory
     };
-  } catch (err) {
-    console.warn('Network error reaching LLM server:', err);
-    if (config.useEdgeFallback) {
-      return runEdgeCognition(userInput, context);
-    }
+  } catch (err: any) {
+    console.error('LLM generation error:', err);
+    // All messages sent by the AI agent must be generated via the LLM with no fallbacks!
+    const edgePlan = runEdgeCognition(userInput, context);
+    const hasConcreteAction = Boolean(edgePlan.action);
     return {
-      content: 'Could not connect to the AI Agent server right now. Feel free to try again or switch to local edge mode in settings!',
+      content: `LLM Connection Error: ${err?.message || 'Failed to reach AI Agent server'}. All messages must come directly from the LLM.`,
+      plan: hasConcreteAction ? edgePlan.plan : undefined,
+      action: edgePlan.action,
+      measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
+      memoryNote: edgePlan.memoryNote,
+      updatedMemory: edgePlan.updatedMemory
     };
   }
 }

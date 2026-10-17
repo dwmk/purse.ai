@@ -18,7 +18,9 @@ import {
   Cpu,
   Check,
   HardDrive,
-  Loader2
+  Loader2,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { MODEL_OPTIONS, MODEL_LOGOS } from '../../constants/models';
 import { BrowserLMService } from '../../services/browserLm';
@@ -143,11 +145,12 @@ export const AgentChatView: React.FC = () => {
 
 
   const quickPrompts = [
-    'Hey Fiona! How are my finances looking today?',
-    'Can I afford a $45 dinner out tonight?',
-    'Spent $42.50 at Trader Joe\'s',
-    'What is my zero-income cash runway?',
-    'Audit recurring subscriptions for leaks'
+    'How are my finances looking today?',
+    'Can I afford to make a discretionary purchase?',
+    'Log an expense to my ledger',
+    'Calculate my zero-income cash runway',
+    'Audit recurring subscriptions for leaks',
+    'Review my envelope budgets'
   ];
 
   const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];
@@ -177,7 +180,39 @@ export const AgentChatView: React.FC = () => {
       {!is3DMode && (
         <>
           {/* Messages Timeline */}
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin flex flex-col">
+            {/* When opening chat with no messages: show clean suggestions without any specific names or numbers */}
+            {chatMessages.length === 0 && (
+              <div className="flex-1 flex flex-col items-center justify-center py-10 px-4 text-center my-auto space-y-6 animate-in fade-in duration-200">
+                <div className="w-12 h-12 rounded-2xl bg-violet-100 dark:bg-violet-950/60 text-violet-600 dark:text-violet-400 flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div className="space-y-1.5 max-w-md">
+                  <h3 className="font-bold text-base text-zinc-900 dark:text-zinc-100">
+                    Purse Financial Copilot
+                  </h3>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    Select a suggestion to begin, or type and speak any financial question.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-xl w-full">
+                  {quickPrompts.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => sendMessage(p)}
+                      className="p-3.5 text-left bg-white dark:bg-[#121216] hover:bg-violet-50/60 dark:hover:bg-violet-950/30 text-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 dark:hover:border-violet-600 rounded-2xl transition-all cursor-pointer shadow-xs active:scale-98 group flex items-center justify-between gap-3"
+                    >
+                      <span className="text-xs font-mono group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">
+                        {p}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-violet-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {chatMessages.map(msg => {
               const isUser = msg.sender === 'user';
               const isSpeakingThis = speakingMsgId === msg.id;
@@ -357,23 +392,26 @@ export const AgentChatView: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Prompts Strip */}
-          <div className="py-2 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-            {quickPrompts.map(p => (
-              <button
-                key={p}
-                onClick={() => sendMessage(p)}
-                className="text-[11px] font-mono px-3.5 py-1.5 bg-white dark:bg-[#121216] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer shadow-xs active:scale-95"
-              >
-                {p}
-              </button>
-            ))}
-          </div>
+          {/* Quick Prompts Strip - Only show when no messages are shown yet */}
+          {chatMessages.length === 0 && (
+            <div className="py-2 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
+              {quickPrompts.map(p => (
+                <button
+                  key={p}
+                  onClick={() => sendMessage(p)}
+                  className="text-[11px] font-mono px-3.5 py-1.5 bg-white dark:bg-[#121216] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer shadow-xs active:scale-95"
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      {/* Chat Input Panel with Drop-up Model Selector on Left, Mic beside Send on Right */}
-      <form onSubmit={handleSend} className={`shrink-0 relative pointer-events-auto ${is3DMode ? 'max-w-2xl mx-auto w-full pb-2' : 'pt-1'}`}>
+      {/* Chat Input Panel - Sticky Panel that stays in place while messages scroll */}
+      <div className={`sticky bottom-0 z-30 w-full pointer-events-auto bg-[#F8F9FB]/95 dark:bg-[#0A0910]/95 backdrop-blur-md pt-2 pb-2 sm:pb-3 border-t border-zinc-200/60 dark:border-zinc-800/60 ${is3DMode ? 'max-w-2xl mx-auto' : ''}`}>
+        <form onSubmit={handleSend} className="relative">
         
         {/* Missing API Key Warning with Fix Button */}
         {isCurrentKeyMissing && (
@@ -517,6 +555,7 @@ export const AgentChatView: React.FC = () => {
 
         </div>
       </form>
+      </div>
 
     </div>
   );

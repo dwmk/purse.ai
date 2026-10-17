@@ -19,6 +19,14 @@ export interface ModelProviderOption {
 
 export const MODEL_OPTIONS: ModelProviderOption[] = [
   {
+    id: 'edge',
+    name: 'Browser Edge (Local)',
+    tag: 'smolLM2 / 100% Offline',
+    model: 'smolLM2-360M-instruct',
+    isApiBased: false,
+    description: 'Runs entirely in your browser using local WebAssembly & CacheStorage. Zero external API calls.'
+  },
+  {
     id: 'gemini',
     name: 'Google Gemini',
     tag: 'gemini-3.8-flash',
@@ -26,14 +34,6 @@ export const MODEL_OPTIONS: ModelProviderOption[] = [
     isApiBased: true,
     logo: MODEL_LOGOS.gemini,
     description: 'High-speed analytical reasoning with structured financial insight.'
-  },
-  {
-    id: 'edge',
-    name: 'Browser Edge (Local)',
-    tag: 'smolLM2 / 100% Offline',
-    model: 'smolLM2-360M-instruct',
-    isApiBased: false,
-    description: 'Runs entirely in your browser using local WebAssembly & CacheStorage. Zero external API calls.'
   },
   {
     id: 'openai',

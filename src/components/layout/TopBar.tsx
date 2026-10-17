@@ -134,7 +134,7 @@ export const TopBar: React.FC = () => {
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
               }`}
             >
-              Memory Core
+              Memory
             </button>
           </nav>
         )}
@@ -142,48 +142,53 @@ export const TopBar: React.FC = () => {
         {/* Zone 3: Micro-Interactions (3D Toggle + Mute TTS Toggle + Theme Switcher + Settings Icon) */}
         <div className="flex items-center gap-2 shrink-0">
           
-          {/* 3D / 2D Avatar Toggle Button */}
-          <button
-            onClick={toggle3DMode}
-            title={is3DMode ? '3D Fiona Avatar Active (Click to switch to 2D)' : '3D Mode Inactive (Click to switch to 3D Fiona Avatar)'}
-            aria-label="Toggle 3D Avatar"
-            className={`p-2 rounded-xl border transition-all cursor-pointer tactile-btn ${
-              is3DMode
-                ? 'border-violet-600 bg-violet-600 text-white shadow-xs'
-                : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            <Box className="w-4 h-4" />
-          </button>
+          {/* 3D mode, sound and theme switcher buttons are only visible in /app and inactive on landing page / */}
+          {!isLanding && (
+            <>
+              {/* 3D / 2D Avatar Toggle Button */}
+              <button
+                onClick={toggle3DMode}
+                title={is3DMode ? '3D Fiona Avatar Active (Click to switch to 2D)' : '3D Mode Inactive (Click to switch to 3D Fiona Avatar)'}
+                aria-label="Toggle 3D Avatar"
+                className={`p-2 rounded-xl border transition-all cursor-pointer tactile-btn ${
+                  is3DMode
+                    ? 'border-violet-600 bg-violet-600 text-white shadow-xs'
+                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                <Box className="w-4 h-4" />
+              </button>
 
-          {/* TTS Audio Voice Toggle with immediate speech cutoff */}
-          <button
-            onClick={() => {
-              stopSpeaking();
-              toggleSpeechEnabled();
-            }}
-            title={isSpeechEnabled ? 'Voice readout active (Click to mute & stop)' : 'Voice readout muted (Click to enable)'}
-            className={`p-2 rounded-xl border transition-all cursor-pointer tactile-btn ${
-              isSpeechEnabled
-                ? 'border-violet-600 bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 font-bold'
-                : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-            }`}
-          >
-            {isSpeechEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-          </button>
+              {/* TTS Audio Voice Toggle with immediate speech cutoff */}
+              <button
+                onClick={() => {
+                  stopSpeaking();
+                  toggleSpeechEnabled();
+                }}
+                title={isSpeechEnabled ? 'Voice readout active (Click to mute & stop)' : 'Voice readout muted (Click to enable)'}
+                className={`p-2 rounded-xl border transition-all cursor-pointer tactile-btn ${
+                  isSpeechEnabled
+                    ? 'border-violet-600 bg-violet-100 dark:bg-violet-950/60 text-violet-700 dark:text-violet-300 font-bold'
+                    : 'border-zinc-200 dark:border-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {isSpeechEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+              </button>
 
-          {/* Theme Switcher Button */}
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle dark/light theme"
-            className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-xs active:scale-95"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Moon className="w-4 h-4 text-zinc-600" />
-            )}
-          </button>
+              {/* Theme Switcher Button */}
+              <button
+                onClick={toggleTheme}
+                aria-label="Toggle dark/light theme"
+                className="p-2 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                {theme === 'dark' ? (
+                  <Sun className="w-4 h-4 text-amber-400" />
+                ) : (
+                  <Moon className="w-4 h-4 text-zinc-600" />
+                )}
+              </button>
+            </>
+          )}
 
           {isLanding ? (
             <button

@@ -1,0 +1,4 @@
+Purse AI Public Storage
+File: /test.txt
+Status: 200 OK
+Served directly from /public directory.

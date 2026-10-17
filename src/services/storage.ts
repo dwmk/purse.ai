@@ -422,138 +422,19 @@ export const SEED_MEMORY_FILE: MemoryFile = {
 };
 
 export const SEED_CONFIG: LLMConfig = {
-  provider: 'gemini', // default server-side AI Agent powered by Gemini 3.8
-  model: 'gemini-3.8-flash',
-  useEdgeFallback: false,
+  provider: 'edge', // Prioritize browser-based LLM first
+  model: 'smolLM2-360M-instruct',
+  useEdgeFallback: true,
   autoApproveSafeActions: false
 };
 
 export const SEED_CONVERSATIONS: ConversationSession[] = [
   {
-    id: 'conv_current_1',
-    title: "Trader Joe's & Grocery Envelope",
+    id: 'conv_initial',
+    title: 'New Conversation',
     createdAt: '2026-10-16T09:30:00.000Z',
     updatedAt: '2026-10-16T09:35:00.000Z',
-    messages: [
-      {
-        id: 'msg_welcome',
-        sender: 'agent',
-        content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
-        timestamp: '2026-10-16T09:30:00.000Z'
-      },
-      {
-        id: 'msg_u1',
-        sender: 'user',
-        content: "Spent $42.50 at Trader Joe's",
-        timestamp: '2026-10-16T09:32:00.000Z'
-      },
-      {
-        id: 'msg_a1',
-        sender: 'agent',
-        content: "Got it! I recorded **$42.50** for **Trader Joe's** under your **Groceries** envelope. You still have about $297.50 left for groceries this month, so you're in great shape!",
-        timestamp: '2026-10-16T09:32:02.000Z'
-      }
-    ]
-  },
-  {
-    id: 'conv_oct_14',
-    title: 'Cash Runway & Liquidity Stress Test',
-    createdAt: '2026-10-14T14:15:00.000Z',
-    updatedAt: '2026-10-14T14:18:00.000Z',
-    messages: [
-      {
-        id: 'msg_u_runway',
-        sender: 'user',
-        content: 'What is my cash runway if my income stops?',
-        timestamp: '2026-10-14T14:15:00.000Z'
-      },
-      {
-        id: 'msg_a_runway',
-        sender: 'agent',
-        content: "### Cash Runway & Liquidity Analysis\n\nBased on your total liquid reserves of **$18,090.50** ($3,840.50 checking + $14,250.00 in HYSA emergency vault) and essential fixed needs of **$3,040.00/month**:\n\n- **Zero-Income Runway:** **6.0 months** (~180 days)\n- **Operating Checking Cushion:** $3,840.50 (Floor: $1,200.00)\n- **Safety Invariant:** Your liquidity exceeds the minimum 3-month survival baseline.",
-        timestamp: '2026-10-14T14:15:02.000Z'
-      }
-    ]
-  },
-  {
-    id: 'conv_sep_28',
-    title: 'Subscription Leak & Service Audit',
-    createdAt: '2026-09-28T11:00:00.000Z',
-    updatedAt: '2026-09-28T11:05:00.000Z',
-    messages: [
-      {
-        id: 'msg_u_audit',
-        sender: 'user',
-        content: 'Audit recurring subscriptions for leaks and duplicate charges',
-        timestamp: '2026-09-28T11:00:00.000Z'
-      },
-      {
-        id: 'msg_a_audit',
-        sender: 'agent',
-        content: "### Subscription & Recurring Leak Audit\n\nYou currently have **3 active recurring subscriptions** totaling **$92.98/month** ($1,115.76/year):\n\n- **Netflix Standard HD**: $15.99/mo (Due Nov 13)\n- **Hulu + Disney Bundle**: $19.99/mo (Due Oct 24)\n- **Adobe Creative Cloud**: $54.99/mo (Due Oct 29)\n\n**Flagged Leaks:**\n⚠️ *Adobe CC*: Inactive for 42 days. Downgrading or canceling recovers **$54.99/month** ($659.88/year).",
-        timestamp: '2026-09-28T11:00:03.000Z'
-      }
-    ]
-  },
-  {
-    id: 'conv_sep_12',
-    title: 'Dining Out Affordability Check',
-    createdAt: '2026-09-12T19:40:00.000Z',
-    updatedAt: '2026-09-12T19:42:00.000Z',
-    messages: [
-      {
-        id: 'msg_u_dining',
-        sender: 'user',
-        content: 'Can I afford a $120 dinner out tonight?',
-        timestamp: '2026-09-12T19:40:00.000Z'
-      },
-      {
-        id: 'msg_a_dining',
-        sender: 'agent',
-        content: "Yes, you can totally afford it! You have about $225 remaining in your Dining envelope this month, and your checking balance will comfortably stay at $3,720.50 (well above your $1,200 safety floor). Have a wonderful dinner tonight!",
-        timestamp: '2026-09-12T19:40:02.000Z'
-      }
-    ]
-  },
-  {
-    id: 'conv_aug_20',
-    title: 'Emergency Vault Invariant Setup',
-    createdAt: '2026-08-20T16:10:00.000Z',
-    updatedAt: '2026-08-20T16:15:00.000Z',
-    messages: [
-      {
-        id: 'msg_u_inv',
-        sender: 'user',
-        content: 'Remember that emergency savings target is $15,000 and minimum checking cushion is $1,200',
-        timestamp: '2026-08-20T16:10:00.000Z'
-      },
-      {
-        id: 'msg_a_inv',
-        sender: 'agent',
-        content: "I have updated your **Persistent Memory File** with these baseline invariants:\n\n- **Emergency Vault Target:** $15,000.00\n- **Minimum Checking Cushion Floor:** $1,200.00\n\nThese invariants are committed to your local encrypted memory graph.",
-        timestamp: '2026-08-20T16:10:03.000Z'
-      }
-    ]
-  },
-  {
-    id: 'conv_dec_2025',
-    title: '2025 Year-End Savings & Portfolio Review',
-    createdAt: '2025-12-30T18:00:00.000Z',
-    updatedAt: '2025-12-30T18:10:00.000Z',
-    messages: [
-      {
-        id: 'msg_u_yearend',
-        sender: 'user',
-        content: 'Summarize 2025 savings rate and investment portfolio allocations',
-        timestamp: '2025-12-30T18:00:00.000Z'
-      },
-      {
-        id: 'msg_a_yearend',
-        sender: 'agent',
-        content: "### 2025 Annual Financial Position Review\n\n- **Annual Savings Rate Achieved:** **21.4%** across high-yield savings and index funds.\n- **Vanguard Index Portfolio Inflow:** +$14,400.00 for the year.\n- **Emergency Vault Progress:** 85% of target attained.\n\nAll operating invariants satisfied throughout 2025.",
-        timestamp: '2025-12-30T18:00:04.000Z'
-      }
-    ]
+    messages: []
   }
 ];
 
@@ -726,20 +607,19 @@ export const StorageService = {
         title: 'New Conversation',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messages: [
-          {
-            id: 'msg_welcome',
-            sender: 'agent',
-            content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
-            timestamp: new Date().toISOString()
-          }
-        ]
+        messages: []
       };
       return [initialConv];
     }
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Strip out any legacy hardcoded default welcome messages so only real LLM outputs are shown
+        return parsed.map((c: ConversationSession) => ({
+          ...c,
+          messages: (c.messages || []).filter(m => m.id !== 'msg_welcome' && !m.id.startsWith('msg_welcome_'))
+        }));
+      }
       return [];
     } catch {
       return [];
@@ -783,10 +663,10 @@ export const StorageService = {
     }
     try {
       const parsed = JSON.parse(raw);
-      if (!parsed.provider || parsed.provider === 'edge' || parsed.model === 'gemini-flash-latest' || parsed.model === 'gemini-2.5-flash') {
-        parsed.provider = 'gemini';
-        parsed.model = 'gemini-3.8-flash';
-        parsed.useEdgeFallback = false;
+      if (!parsed.provider) {
+        parsed.provider = 'edge';
+        parsed.model = 'smolLM2-360M-instruct';
+        parsed.useEdgeFallback = true;
         localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed));
       }
       return { ...SEED_CONFIG, ...parsed };

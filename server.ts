@@ -3,6 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -15,6 +16,78 @@ async function startServer() {
   const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
+
+  // Allow fetching any custom files or items stored in /public directory as "/file.extension"
+  const publicDir = path.resolve(__dirname, 'public');
+
+  // Mount express.static for public files at root and at /public
+  app.use(express.static(publicDir, { dotfiles: 'allow', fallthrough: true, index: false }));
+  app.use('/public', express.static(publicDir, { dotfiles: 'allow' }));
+
+  // Intercept ANY static file requests before Vite or Express HTML fallback
+  app.use((req, res, next) => {
+    const rawPath = req.path;
+
+    // NEVER intercept API routes, /app, Vite dev internals, node_modules, or source code
+    if (
+      rawPath.startsWith('/api') ||
+      rawPath === '/app' ||
+      rawPath.startsWith('/app/') ||
+      rawPath.startsWith('/@') ||
+      rawPath.startsWith('/src') ||
+      rawPath.startsWith('/node_modules') ||
+      rawPath.startsWith('/.vite') ||
+      rawPath.endsWith('.tsx') ||
+      rawPath.endsWith('.ts') ||
+      rawPath.endsWith('.jsx') ||
+      rawPath.endsWith('.js') ||
+      rawPath.endsWith('.mjs') ||
+      rawPath.endsWith('.css') ||
+      req.url.includes('?import') ||
+      req.url.includes('?t=') ||
+      req.url.includes('?v=')
+    ) {
+      return next();
+    }
+
+    const cleanPath = decodeURIComponent(rawPath).replace(/^\/+/, '');
+    if (!cleanPath) {
+      return next();
+    }
+
+    // 1. Check in /public directory (e.g. /icon.svg -> /public/icon.svg, /test.txt, /idle.fbx, /model.vrm)
+    const publicFilePath = path.join(publicDir, cleanPath);
+    if (fs.existsSync(publicFilePath) && fs.statSync(publicFilePath).isFile()) {
+      return res.sendFile(publicFilePath);
+    }
+
+    // Also support /public/filename.ext explicitly
+    if (cleanPath.startsWith('public/')) {
+      const subPath = cleanPath.replace(/^public\//, '');
+      const subFilePath = path.join(publicDir, subPath);
+      if (fs.existsSync(subFilePath) && fs.statSync(subFilePath).isFile()) {
+        return res.sendFile(subFilePath);
+      }
+    }
+
+    // 2. Check for explicit root metadata files
+    const ALLOWED_ROOT_FILES = new Set(['manifest.json', 'metadata.json', 'icon.svg', 'thumbnail.png', 'robots.txt']);
+    if (ALLOWED_ROOT_FILES.has(cleanPath)) {
+      const rootFilePath = path.join(__dirname, cleanPath);
+      if (fs.existsSync(rootFilePath) && fs.statSync(rootFilePath).isFile()) {
+        return res.sendFile(rootFilePath);
+      }
+    }
+
+    // 3. If the request is for a file with an extension (e.g. /something.ext, /model.vrm)
+    // and it does NOT exist: DO NOT let Vite SPA fallback serve index.html (which would redirect to the landing page).
+    // Instead return an explicit 404!
+    if (path.extname(cleanPath) && !cleanPath.endsWith('.html')) {
+      return res.status(404).type('text/plain').send(`404 Not Found: File "${cleanPath}" was not found in /public.`);
+    }
+
+    next();
+  });
 
   // Initialize server-side Gemini client
   const geminiApiKey = process.env.GEMINI_API_KEY || '';
@@ -52,12 +125,12 @@ async function startServer() {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // 1. GEMINI PROVIDER
-      if (provider === 'gemini') {
+      // 1. GEMINI PROVIDER (and edge default)
+      if (provider === 'gemini' || provider === 'edge') {
         const keyToUse = apiKey || process.env.GEMINI_API_KEY;
         if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
           return res.status(400).json({
-            error: 'No valid Gemini API key found. Please enter a key in Settings or run with Edge mode.'
+            error: 'No valid Gemini API key found. Please enter a key in Settings.'
           });
         }
 

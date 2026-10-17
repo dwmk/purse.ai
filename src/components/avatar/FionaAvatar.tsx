@@ -464,17 +464,28 @@ export const FionaAvatar: React.FC = () => {
         )}
       </div>
 
-      {/* Subtitles: Shown ONLY when 3D mode is active, showing recent 5-6 words in an uncluttered pill */}
+      {/* Subtitles: Shown ONLY when 3D mode is active, showing spoken words with current word highlighted */}
       {is3DMode && Boolean(activeSubtitle) && (
         <div className="fixed bottom-24 sm:bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[90%] pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="bg-zinc-950/92 dark:bg-zinc-900/95 text-white px-5 py-2.5 rounded-full border border-violet-500/40 shadow-2xl backdrop-blur-md flex items-center justify-center gap-2.5 text-center text-xs sm:text-sm font-sans font-medium">
+          <div className="bg-zinc-950/92 dark:bg-zinc-900/95 text-white px-5 py-2.5 rounded-full border border-violet-500/40 shadow-2xl backdrop-blur-md flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-sans font-medium">
             <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse shrink-0" />
-            <span className="text-[10px] font-mono text-violet-300 font-bold uppercase tracking-wider shrink-0">
-              Fiona:
-            </span>
-            <p className="truncate text-balance text-zinc-100 font-medium">
-              {activeSubtitle}
-            </p>
+            <div className="truncate text-balance text-zinc-100 font-medium flex items-center justify-center gap-1.5 flex-wrap">
+              {activeSubtitle.split(/\s+/).filter(Boolean).map((word, idx, arr) => {
+                const isCurrentWord = idx === arr.length - 1;
+                return (
+                  <span
+                    key={idx}
+                    className={
+                      isCurrentWord
+                        ? 'text-violet-300 font-bold bg-violet-600/30 px-1.5 py-0.5 rounded-md border border-violet-400/30 shadow-xs'
+                        : 'text-zinc-300'
+                    }
+                  >
+                    {word}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
