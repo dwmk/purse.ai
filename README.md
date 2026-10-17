@@ -1,7 +1,6 @@
 # Purse Autonomous Finance
 
-> **Decentralized, edge-computing personal finance copilot powered by hybrid AI agents, smart budgeting envelopes, subscription leak detection, and long-term memory.**  
-> *Developed for the 2026 Shenzhen International FinTech Competition.*
+> **Interactive blend of Human-Computer Interaction (HCI) concepts with decentralized edge computing AI technology for a fully private, self-hosted user-friendly workspace.*
 
 ---
 
