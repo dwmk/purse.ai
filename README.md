@@ -1,6 +1,6 @@
 # Purse Autonomous Finance
 
-> **Interactive blend of Human-Computer Interaction (HCI) concepts with decentralized edge computing AI technology for a fully private, self-hosted user-friendly workspace.*
+> **Interactive blend of Human-Computer Interaction (HCI) concepts with decentralized edge computing AI technology for a fully private, self-hosted user-friendly workspace.**
 
 ---
 
