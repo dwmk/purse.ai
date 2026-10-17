@@ -23,8 +23,8 @@ export const BottomDock: React.FC = () => {
   ];
 
   return (
-    <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-sm w-[92%] sm:w-auto">
-      <nav className="p-1.5 rounded-full border border-[#C794B0] dark:border-[#B59DD1] bg-[#F3ACB4] dark:bg-[#8A7EA4] shadow-xl flex items-center justify-around sm:gap-2">
+    <div className="sm:hidden fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-sm w-[92%]">
+      <nav className="p-1.5 rounded-full border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-[#121216]/90 backdrop-blur-md shadow-2xl flex items-center justify-around">
         {tabs.map(t => {
           const isActive = currentView === t.view;
           return (
@@ -33,8 +33,8 @@ export const BottomDock: React.FC = () => {
               onClick={() => setCurrentView(t.view)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-[#8A7EA4] text-[#F9BBAE] dark:bg-[#F9BBAE] dark:text-[#8A7EA4] font-bold shadow-md scale-105'
-                  : 'text-[#8A7EA4] dark:text-[#F9BBAE] hover:bg-[#B59DD1]/40'
+                  ? 'bg-violet-600 text-white font-bold shadow-md scale-105'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
               }`}
             >
               {t.icon}

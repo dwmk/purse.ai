@@ -3,6 +3,7 @@ import {
   Bill,
   BudgetEnvelope,
   ChatMessage,
+  ConversationSession,
   ExpenseCategory,
   MemoryFile,
   Transaction,
@@ -17,6 +18,7 @@ const STORAGE_KEYS = {
   BUDGETS: 'purse_budgets_v1',
   MEMORY: 'purse_memory_v1',
   CHAT: 'purse_chat_v1',
+  CONVERSATIONS: 'purse_conversations_v2',
   ACTIONS: 'purse_actions_v1',
   CONFIG: 'purse_config_v1',
   THEME: 'purse_theme_v1'
@@ -30,6 +32,7 @@ const LEGACY_KEYS: Record<string, string> = {
   BUDGETS: 'kitefi_budgets_v1',
   MEMORY: 'kitefi_memory_v1',
   CHAT: 'kitefi_chat_v1',
+  CONVERSATIONS: 'purse_conversations_v1',
   ACTIONS: 'kitefi_actions_v1',
   CONFIG: 'kitefi_config_v1',
   THEME: 'kitefi_theme_v1'
@@ -425,6 +428,135 @@ export const SEED_CONFIG: LLMConfig = {
   autoApproveSafeActions: false
 };
 
+export const SEED_CONVERSATIONS: ConversationSession[] = [
+  {
+    id: 'conv_current_1',
+    title: "Trader Joe's & Grocery Envelope",
+    createdAt: '2026-10-16T09:30:00.000Z',
+    updatedAt: '2026-10-16T09:35:00.000Z',
+    messages: [
+      {
+        id: 'msg_welcome',
+        sender: 'agent',
+        content: 'Hello! I am **Purse**, your personal AI finance assistant. I operate privately in your browser storage with zero cloud tracking. What would you like to log or review today?',
+        timestamp: '2026-10-16T09:30:00.000Z'
+      },
+      {
+        id: 'msg_u1',
+        sender: 'user',
+        content: "Spent $42.50 at Trader Joe's",
+        timestamp: '2026-10-16T09:32:00.000Z'
+      },
+      {
+        id: 'msg_a1',
+        sender: 'agent',
+        content: "I parsed your intent to record **$42.50** for **Trader Joe's** categorized under **Groceries**.\n\n- **Impact:** -$42.50 to Primary Operating Checking\n- **Projected Balance:** $3,798.00\n- **Envelope Headroom:** $297.50 remaining in Groceries\n\nExecution plan ready.",
+        timestamp: '2026-10-16T09:32:02.000Z'
+      }
+    ]
+  },
+  {
+    id: 'conv_oct_14',
+    title: 'Cash Runway & Liquidity Stress Test',
+    createdAt: '2026-10-14T14:15:00.000Z',
+    updatedAt: '2026-10-14T14:18:00.000Z',
+    messages: [
+      {
+        id: 'msg_u_runway',
+        sender: 'user',
+        content: 'What is my cash runway if my income stops?',
+        timestamp: '2026-10-14T14:15:00.000Z'
+      },
+      {
+        id: 'msg_a_runway',
+        sender: 'agent',
+        content: "### Cash Runway & Liquidity Analysis\n\nBased on your total liquid reserves of **$18,090.50** ($3,840.50 checking + $14,250.00 in HYSA emergency vault) and essential fixed needs of **$3,040.00/month**:\n\n- **Zero-Income Runway:** **6.0 months** (~180 days)\n- **Operating Checking Cushion:** $3,840.50 (Floor: $1,200.00)\n- **Safety Invariant:** Your liquidity exceeds the minimum 3-month survival baseline.",
+        timestamp: '2026-10-14T14:15:02.000Z'
+      }
+    ]
+  },
+  {
+    id: 'conv_sep_28',
+    title: 'Subscription Leak & Service Audit',
+    createdAt: '2026-09-28T11:00:00.000Z',
+    updatedAt: '2026-09-28T11:05:00.000Z',
+    messages: [
+      {
+        id: 'msg_u_audit',
+        sender: 'user',
+        content: 'Audit recurring subscriptions for leaks and duplicate charges',
+        timestamp: '2026-09-28T11:00:00.000Z'
+      },
+      {
+        id: 'msg_a_audit',
+        sender: 'agent',
+        content: "### Subscription & Recurring Leak Audit\n\nYou currently have **3 active recurring subscriptions** totaling **$92.98/month** ($1,115.76/year):\n\n- **Netflix Standard HD**: $15.99/mo (Due Nov 13)\n- **Hulu + Disney Bundle**: $19.99/mo (Due Oct 24)\n- **Adobe Creative Cloud**: $54.99/mo (Due Oct 29)\n\n**Flagged Leaks:**\n⚠️ *Adobe CC*: Inactive for 42 days. Downgrading or canceling recovers **$54.99/month** ($659.88/year).",
+        timestamp: '2026-09-28T11:00:03.000Z'
+      }
+    ]
+  },
+  {
+    id: 'conv_sep_12',
+    title: 'Dining Out Affordability Check',
+    createdAt: '2026-09-12T19:40:00.000Z',
+    updatedAt: '2026-09-12T19:42:00.000Z',
+    messages: [
+      {
+        id: 'msg_u_dining',
+        sender: 'user',
+        content: 'Can I afford a $120 dinner out tonight?',
+        timestamp: '2026-09-12T19:40:00.000Z'
+      },
+      {
+        id: 'msg_a_dining',
+        sender: 'agent',
+        content: "### Affordability Evaluation: $120.00 for Dining & Nightlife\n\n- **Envelope Headroom:** $225.00 remaining in Dining & Nightlife.\n- **Checking Cushion:** Checking balance will remain comfortably above your $1,200.00 floor ($3,720.50).\n\n✅ **Approved for Safe Execution**: This expenditure fits your discretionary budget envelope.",
+        timestamp: '2026-09-12T19:40:02.000Z'
+      }
+    ]
+  },
+  {
+    id: 'conv_aug_20',
+    title: 'Emergency Vault Invariant Setup',
+    createdAt: '2026-08-20T16:10:00.000Z',
+    updatedAt: '2026-08-20T16:15:00.000Z',
+    messages: [
+      {
+        id: 'msg_u_inv',
+        sender: 'user',
+        content: 'Remember that emergency savings target is $15,000 and minimum checking cushion is $1,200',
+        timestamp: '2026-08-20T16:10:00.000Z'
+      },
+      {
+        id: 'msg_a_inv',
+        sender: 'agent',
+        content: "I have updated your **Persistent Memory File** with these baseline invariants:\n\n- **Emergency Vault Target:** $15,000.00\n- **Minimum Checking Cushion Floor:** $1,200.00\n\nThese invariants are committed to your local encrypted memory graph.",
+        timestamp: '2026-08-20T16:10:03.000Z'
+      }
+    ]
+  },
+  {
+    id: 'conv_dec_2025',
+    title: '2025 Year-End Savings & Portfolio Review',
+    createdAt: '2025-12-30T18:00:00.000Z',
+    updatedAt: '2025-12-30T18:10:00.000Z',
+    messages: [
+      {
+        id: 'msg_u_yearend',
+        sender: 'user',
+        content: 'Summarize 2025 savings rate and investment portfolio allocations',
+        timestamp: '2025-12-30T18:00:00.000Z'
+      },
+      {
+        id: 'msg_a_yearend',
+        sender: 'agent',
+        content: "### 2025 Annual Financial Position Review\n\n- **Annual Savings Rate Achieved:** **21.4%** across high-yield savings and index funds.\n- **Vanguard Index Portfolio Inflow:** +$14,400.00 for the year.\n- **Emergency Vault Progress:** 85% of target attained.\n\nAll operating invariants satisfied throughout 2025.",
+        timestamp: '2025-12-30T18:00:04.000Z'
+      }
+    ]
+  }
+];
+
 // Storage helper functions
 export const StorageService = {
   getItemWithMigration(key: string, legacyKey: string): string | null {
@@ -548,6 +680,36 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.CHAT, JSON.stringify(messages));
   },
 
+  getConversations(): ConversationSession[] {
+    const raw = this.getItemWithMigration(STORAGE_KEYS.CONVERSATIONS, LEGACY_KEYS.CONVERSATIONS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(SEED_CONVERSATIONS));
+      return SEED_CONVERSATIONS;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      return SEED_CONVERSATIONS;
+    } catch {
+      return SEED_CONVERSATIONS;
+    }
+  },
+
+  saveConversations(conversations: ConversationSession[]): void {
+    localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(conversations));
+  },
+
+  getActiveConversationId(): string {
+    const saved = localStorage.getItem('purse_active_conv_id');
+    if (saved) return saved;
+    const convs = this.getConversations();
+    return convs[0]?.id || 'conv_current_1';
+  },
+
+  saveActiveConversationId(id: string): void {
+    localStorage.setItem('purse_active_conv_id', id);
+  },
+
   getActions(): AgentAction[] {
     const raw = this.getItemWithMigration(STORAGE_KEYS.ACTIONS, LEGACY_KEYS.ACTIONS);
     if (!raw) return [];
@@ -631,12 +793,13 @@ export const StorageService = {
     Object.values(LEGACY_KEYS).forEach(k => localStorage.removeItem(k));
     localStorage.removeItem('kitefi_speech_enabled');
     localStorage.removeItem('purse_speech_enabled');
+    localStorage.removeItem('purse_active_conv_id');
   },
 
   // Export entire application state as a single JSON file
   exportAllDataJson(): string {
     const payload = {
-      version: '2.0.0',
+      version: '2.1.0',
       exportedAt: new Date().toISOString(),
       app: 'Purse Autonomous Finance',
       accounts: this.getAccounts(),
@@ -644,6 +807,7 @@ export const StorageService = {
       bills: this.getBills(),
       budgets: this.getBudgets(),
       memory: this.getMemory(),
+      conversations: this.getConversations(),
       actions: this.getActions(),
       config: this.getConfig()
     };
@@ -666,6 +830,7 @@ export const StorageService = {
       if (data.bills) this.saveBills(data.bills);
       if (data.budgets) this.saveBudgets(data.budgets);
       if (data.memory) this.saveMemory(data.memory);
+      if (data.conversations && Array.isArray(data.conversations)) this.saveConversations(data.conversations);
       if (data.actions) this.saveActions(data.actions);
       if (data.config) this.saveConfig(data.config);
 
@@ -776,6 +941,8 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(SEED_BILLS));
     localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(SEED_BUDGETS));
     localStorage.setItem(STORAGE_KEYS.MEMORY, JSON.stringify(SEED_MEMORY_FILE));
+    localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(SEED_CONVERSATIONS));
+    localStorage.setItem('purse_active_conv_id', SEED_CONVERSATIONS[0].id);
     localStorage.setItem(STORAGE_KEYS.ACTIONS, JSON.stringify([]));
   }
 };
