@@ -86,7 +86,11 @@ Return ONLY a valid JSON object with the following schema (no markdown formattin
     if (provider === 'gemini') {
       const keyToUse = apiKey || process.env.GEMINI_API_KEY;
       if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
-        return res.status(400).json({ error: 'Missing Gemini API key for transaction organization' });
+        return res.status(200).json({
+          error: 'Missing Gemini API key for transaction organization',
+          missingKey: true,
+          organized: null
+        });
       }
 
       const client = new GoogleGenAI({

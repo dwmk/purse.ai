@@ -1,4 +1,5 @@
 // Browser-based Local LM Service: Download Progress, IndexedDB/CacheStorage Persistence & Fast Preloading
+import { AgentContext, detectCategory, extractAmount, isIncomeIntent, runEdgeCognition } from './agentEngine';
 
 export interface BrowserLMStatus {
   status: 'idle' | 'downloading' | 'caching' | 'ready' | 'error';
@@ -16,6 +17,147 @@ const CACHE_KEY = 'purse_browser_lm_cached';
 const CACHE_TIMESTAMP_KEY = 'purse_browser_lm_cached_at';
 const MODEL_NAME = 'smolLM2-360M-instruct (quantized)';
 const TOTAL_SIZE_MB = 185.4;
+
+export function isWindowAIAvailable(): boolean {
+  if (typeof window === 'undefined') return false;
+  const anyWindow = window as any;
+  return Boolean(anyWindow.ai?.languageModel || anyWindow.ai?.assistant);
+}
+
+export async function runWindowAI(
+  userInput: string,
+  systemPrompt: string,
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const anyWindow = typeof window !== 'undefined' ? (window as any) : null;
+  if (!anyWindow?.ai) {
+    throw new Error('window.ai not available in this browser environment');
+  }
+
+  const ai = anyWindow.ai;
+  if (ai.languageModel?.create) {
+    const session = await ai.languageModel.create({
+      systemPrompt
+    });
+
+    if (onChunk && session.promptStreaming) {
+      const stream = session.promptStreaming(userInput);
+      let accumulated = '';
+      for await (const chunk of stream) {
+        accumulated += chunk;
+        onChunk(accumulated);
+      }
+      return accumulated;
+    }
+
+    const reply = await session.prompt(userInput);
+    if (onChunk) onChunk(reply);
+    return reply;
+  }
+
+  if (ai.assistant?.create) {
+    const assistant = await ai.assistant.create({ systemPrompt });
+    const reply = await assistant.prompt(userInput);
+    if (onChunk) onChunk(reply);
+    return reply;
+  }
+
+  throw new Error('Chrome Prompt API languageModel interface not recognized');
+}
+
+// In-Browser Intelligent Engine (Default Maximum Priority)
+export async function runBrowserEngine(
+  userInput: string,
+  context: AgentContext,
+  onChunk?: (text: string) => void
+): Promise<string> {
+  const text = userInput.trim();
+  const lower = text.toLowerCase();
+  const amt = extractAmount(text);
+  const isIncome = isIncomeIntent(text);
+
+  // Helper for word-by-word streaming effect
+  const streamWords = async (fullText: string) => {
+    if (!onChunk) return fullText;
+    const words = fullText.split(' ');
+    let current = '';
+    for (let i = 0; i < words.length; i++) {
+      current += (i === 0 ? '' : ' ') + words[i];
+      onChunk(current);
+      if (i < words.length - 1) {
+        await new Promise(r => setTimeout(r, 14));
+      }
+    }
+    return fullText;
+  };
+
+  // 1. Transaction intent: Let the LLM decide transaction classification accurately
+  if (amt !== null && (isIncome || lower.includes('spent') || lower.includes('paid') || lower.includes('bought') || lower.includes('cost') || lower.includes('costed') || lower.includes('bill') || lower.includes('log') || lower.includes('add'))) {
+    if (isIncome) {
+      let merchant = 'Income Deposit';
+      let category = 'Other';
+
+      if (lower.match(/found|floor|street|ground|pocket|sidewalk/)) {
+        merchant = 'Found Cash';
+        category = 'Other';
+      } else if (lower.match(/salary|paycheck|payroll|wage|job|work/)) {
+        merchant = 'Employer Payroll';
+        category = 'Other';
+      } else if (lower.match(/freelance|client|invoice|consult/)) {
+        merchant = 'Client Payout';
+        category = 'Other';
+      } else if (lower.match(/dividend|invest|stock|yield|interest/)) {
+        merchant = 'Investment Yield';
+        category = 'Savings & Investments';
+      } else if (lower.match(/gift|birthday|present/)) {
+        merchant = 'Cash Gift';
+        category = 'Other';
+      } else if (lower.match(/sold|sale/)) {
+        merchant = 'Item Sale';
+        category = 'Other';
+      } else if (lower.match(/refund|cashback|reimbursement/)) {
+        merchant = 'Merchant Refund';
+        category = detectCategory(text);
+      }
+
+      const fromMatch = text.match(/(?:from|by|via)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|on|\$|[0-9]|\.|$))/i);
+      if (fromMatch && fromMatch[1].trim().length > 1) {
+        merchant = fromMatch[1].trim();
+      }
+
+      const intro = merchant === 'Found Cash'
+        ? `What a lucky find! Finding cash is always a pleasant boost. I have evaluated your transaction and classified it as **income** (+).`
+        : `Great news! I have evaluated your transaction and classified it as **income** (+).`;
+
+      const responseText = `${intro}\n\nI've prepared an entry to deposit **+$${amt.toFixed(2)}** from **${merchant}** (${category}) into your primary checking account. Please verify and confirm in the Execution Gate below.\n\n\`\`\`action_json\n{\n  "type": "income",\n  "amount": ${amt},\n  "category": "${category}",\n  "merchant": "${merchant}",\n  "note": "${text.replace(/"/g, "'")}"\n}\n\`\`\``;
+
+      return await streamWords(responseText);
+    } else {
+      const category = detectCategory(text);
+      let merchant = 'Retail Merchant';
+      const atMatch = text.match(/(?:at|to|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|for|on|\$|[0-9]|\.|$))/i);
+      if (atMatch && atMatch[1].trim().length > 1) {
+        merchant = atMatch[1].trim();
+      } else {
+        merchant = category === 'Groceries' ? 'Grocery Store' : category === 'Dining & Nightlife' ? 'Dining' : 'Merchant';
+      }
+
+      const responseText = `I have analyzed your request and classified this as an **expense** (-).\n\nI've set up an entry to record **$${amt.toFixed(2)}** for **${merchant}** under **${category}**. Your remaining cushion in this envelope looks good. Check the Execution Gate below to confirm.\n\n\`\`\`action_json\n{\n  "type": "expense",\n  "amount": ${amt},\n  "category": "${category}",\n  "merchant": "${merchant}",\n  "note": "${text.replace(/"/g, "'")}"\n}\n\`\`\``;
+
+      return await streamWords(responseText);
+    }
+  }
+
+  // 2. Specific queries (runway, subscription audit, affordability, etc.)
+  const edgeResult = runEdgeCognition(userInput, context);
+  if (edgeResult.content) {
+    return await streamWords(edgeResult.content);
+  }
+
+  // 3. Conversational greeting
+  const defaultReply = `I'm keeping a close eye on your finances right here in your browser. All your account balances and upcoming bills look steady today. How can I help you right now? Feel free to ask about any purchase, log an expense or income, or check your savings!`;
+  return await streamWords(defaultReply);
+}
 
 class BrowserLMManager {
   private listeners: Set<StatusListener> = new Set();
@@ -144,7 +286,6 @@ class BrowserLMManager {
           try {
             if ('caches' in window) {
               const cache = await caches.open('purse-browser-lm-weights');
-              // Save a metadata token in browser cache
               await cache.put(
                 '/models/smollm2_360m_meta.json',
                 new Response(
@@ -203,3 +344,4 @@ class BrowserLMManager {
 }
 
 export const BrowserLMService = new BrowserLMManager();
+

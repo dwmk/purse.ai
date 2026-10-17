@@ -32,12 +32,23 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Messages array is required' });
     }
 
-    // 1. GEMINI PROVIDER (and edge default)
-    if (provider === 'gemini' || provider === 'edge') {
+    // 1. EDGE PROVIDER (Browser-based execution)
+    if (provider === 'edge') {
+      return res.status(200).json({
+        reply: 'Edge model operates locally in browser storage.',
+        provider: 'edge',
+        model: 'smolLM2-360M-instruct'
+      });
+    }
+
+    // 2. GEMINI PROVIDER
+    if (provider === 'gemini') {
       const keyToUse = apiKey || process.env.GEMINI_API_KEY;
       if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
-        return res.status(400).json({
-          error: 'No valid Gemini API key found. Please enter a key in Settings or set GEMINI_API_KEY.'
+        return res.status(200).json({
+          error: 'No valid Gemini API key found. Please enter a key in Settings or set GEMINI_API_KEY.',
+          missingKey: true,
+          reply: ''
         });
       }
 

@@ -72,6 +72,7 @@ interface FinanceContextType {
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
   deleteTransaction: (id: string) => void;
   addBill: (bill: Omit<Bill, 'id'>) => void;
+  updateBill: (id: string, bill: Partial<Omit<Bill, 'id'>>) => void;
   toggleBillPaid: (id: string) => void;
   deleteBill: (id: string) => void;
   updateBudget: (id: string, allocated: number) => void;
@@ -810,6 +811,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     showNotification('success', `Scheduled bill ${newBill.name} ($${newBill.amount.toFixed(2)})`);
   };
 
+  const updateBill = (id: string, updatedFields: Partial<Omit<Bill, 'id'>>) => {
+    const updated = bills.map(b => (b.id === id ? { ...b, ...updatedFields } : b));
+    setBills(updated);
+    StorageService.saveBills(updated);
+    refreshStorageUsage();
+    showNotification('success', 'Updated bill details');
+  };
+
   const toggleBillPaid = (id: string) => {
     const updated = bills.map(b => (b.id === id ? { ...b, isPaidThisCycle: !b.isPaidThisCycle } : b));
     setBills(updated);
@@ -984,6 +993,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         addTransaction,
         deleteTransaction,
         addBill,
+        updateBill,
         toggleBillPaid,
         deleteBill,
         updateBudget,

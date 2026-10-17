@@ -125,12 +125,23 @@ async function startServer() {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // 1. GEMINI PROVIDER (and edge default)
-      if (provider === 'gemini' || provider === 'edge') {
+      // 1. EDGE PROVIDER (Browser-based execution)
+      if (provider === 'edge') {
+        return res.status(200).json({
+          reply: 'Edge model operates locally in browser storage.',
+          provider: 'edge',
+          model: 'smolLM2-360M-instruct'
+        });
+      }
+
+      // 2. GEMINI PROVIDER
+      if (provider === 'gemini') {
         const keyToUse = apiKey || process.env.GEMINI_API_KEY;
         if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
-          return res.status(400).json({
-            error: 'No valid Gemini API key found. Please enter a key in Settings.'
+          return res.status(200).json({
+            error: 'No valid Gemini API key found. Please enter a key in Settings or set GEMINI_API_KEY.',
+            missingKey: true,
+            reply: ''
           });
         }
 
@@ -428,7 +439,11 @@ Return ONLY a valid JSON object with the following schema (no markdown formattin
       if (provider === 'gemini') {
         const keyToUse = apiKey || process.env.GEMINI_API_KEY;
         if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
-          return res.status(400).json({ error: 'Missing Gemini API key for transaction organization' });
+          return res.status(200).json({
+            error: 'Missing Gemini API key for transaction organization',
+            missingKey: true,
+            organized: null
+          });
         }
 
         const client = apiKey ? new GoogleGenAI({

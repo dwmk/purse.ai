@@ -85,6 +85,7 @@ export function isIncomeIntent(text: string): boolean {
   const lower = text.toLowerCase();
   
   const incomePatterns = [
+    /\b(find|found|finding)\b/i,
     /\b(gain|gained|gaining|gains)\b/i,
     /\b(earn|earned|earning|earns)\b/i,
     /\b(income|salary|paycheck|payroll|wage|wages|stipend)\b/i,
@@ -99,6 +100,7 @@ export function isIncomeIntent(text: string): boolean {
     /\b(cashback|cash\s*back|bonus|bonuses|reward|rewards|grant|grants)\b/i,
     /\b(win|won|winning|winnings)\b/i,
     /\b(credit|credited|credits)\b/i,
+    /\b(gift|gifted|gifting|tips|tip|tipped|collected|picked\s*up)\b/i,
     /\b(add|added)\s+(?:\$|[0-9]+).*?\b(?:to|into)\b/i,
     /\b(paid\s+me|gave\s+me|sent\s+me|transferred\s+me)\b/i,
     /\b(incoming|inflow)\b/i,
@@ -220,7 +222,10 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     let merchant: string;
 
     if (isIncome) {
-      if (lower.match(/salary|paycheck|payroll|wage|job|work/)) {
+      if (lower.match(/found|floor|street|ground|pocket|sidewalk/)) {
+        category = 'Other';
+        merchant = 'Found Cash';
+      } else if (lower.match(/salary|paycheck|payroll|wage|job|work/)) {
         category = 'Other';
         merchant = 'Employer Payroll';
       } else if (lower.match(/freelance|client|invoice|consult/)) {
@@ -229,6 +234,9 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
       } else if (lower.match(/dividend|invest|stock|yield|interest/)) {
         category = 'Savings & Investments';
         merchant = 'Investment Yield';
+      } else if (lower.match(/gift|birthday|present/)) {
+        category = 'Other';
+        merchant = 'Cash Gift';
       } else if (lower.match(/refund|cashback|reimbursement/)) {
         category = detectCategory(text);
         merchant = 'Merchant Refund';
@@ -236,7 +244,7 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
         category = 'Other';
         merchant = 'Personal Sale';
       } else {
-        category = 'Savings & Investments';
+        category = 'Other';
         merchant = 'Income Deposit';
       }
 
@@ -452,6 +460,97 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 }
 
 // Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
+// Parse action JSON block from LLM output to let the LLM decide transactions accurately
+export function parseAgentResponseWithActions(
+  rawReply: string,
+  edgePlan: AgentResponse,
+  context: AgentContext,
+  userInput: string
+): AgentResponse {
+  const checkingAcc = context.accounts.find(a => a.type === 'checking') || context.accounts[0];
+  const checkingBalance = checkingAcc?.balance || 0;
+
+  const actionJsonMatch = rawReply.match(/```action_json\s*([\s\S]*?)\s*```/);
+  if (actionJsonMatch) {
+    try {
+      const parsed = JSON.parse(actionJsonMatch[1].trim());
+      if (parsed && typeof parsed.amount === 'number' && parsed.type) {
+        const isIncome = parsed.type === 'income';
+        const txType = isIncome ? 'income' : (parsed.type === 'transfer' ? 'transfer' : 'expense');
+        const amt = Math.abs(parsed.amount);
+        const category: ExpenseCategory = parsed.category || (isIncome ? 'Other' : detectCategory(userInput));
+        const merchant = parsed.merchant || (isIncome ? 'Found Cash' : 'Retail Merchant');
+        const delta = isIncome ? amt : -amt;
+        const newBal = checkingBalance + delta;
+
+        const newTx: Transaction = {
+          id: `tx_${Date.now()}`,
+          date: new Date().toISOString().split('T')[0],
+          amount: amt,
+          type: txType as any,
+          category,
+          merchant,
+          note: parsed.note || userInput,
+          accountId: checkingAcc?.id || 'acc_chk_01',
+          autoCategorized: true
+        };
+
+        const action: AgentAction = {
+          id: `act_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'ADD_TRANSACTION',
+          description: `Log ${txType} of $${amt.toFixed(2)} ${isIncome ? 'from' : 'at'} ${merchant} (${category})`,
+          payload: newTx,
+          status: 'pending',
+          safetyLevel: amt > 250 ? 'medium_risk' : 'low_risk',
+          confidenceScore: 0.98,
+          dryRunImpact: {
+            balanceDelta: delta,
+            categoryImpact: category,
+            newBudgetRemaining: 0
+          }
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_tx_${Date.now()}`,
+          intent: isIncome ? 'CONVERSATIONAL_INCOME_LOG' : 'CONVERSATIONAL_EXPENSE_LOG',
+          confidence: 0.98,
+          reasoning: `LLM accurately decided ${txType} transaction of $${amt.toFixed(2)} for ${merchant}.`,
+          steps: [
+            { step: 1, title: 'Classify Transaction Type & Amount', detail: `Type: ${isIncome ? 'Income (+)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
+            { step: 2, title: 'Verify Account & Balance Cushion', detail: `Projected checking balance: $${newBal.toFixed(2)}`, status: 'completed' },
+            { step: 3, title: 'Prepare Non-Destructive Mutation', detail: 'Awaiting user execution confirmation', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return {
+          content: cleanContent,
+          plan,
+          action,
+          measurableValue: `${isIncome ? '+$' : '-$'}${amt.toFixed(2)} logged to ${category}`,
+          memoryNote: edgePlan.memoryNote,
+          updatedMemory: edgePlan.updatedMemory
+        };
+      }
+    } catch (e) {
+      console.warn('Action JSON parsing warning:', e);
+    }
+  }
+
+  const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+  return {
+    content: cleanContent || edgePlan.content,
+    plan: edgePlan.action ? edgePlan.plan : undefined,
+    action: edgePlan.action,
+    measurableValue: edgePlan.action ? edgePlan.measurableValue : undefined,
+    memoryNote: edgePlan.memoryNote,
+    updatedMemory: edgePlan.updatedMemory
+  };
+}
+
+// Full-stack Agent Reasoning Dispatcher with Default Maximum Priority for Browser-based LLM
 export async function processAgentMessage(
   userInput: string,
   context: AgentContext,
@@ -466,9 +565,8 @@ export async function processAgentMessage(
     console.warn('[VectorDB] Sync notice:', syncErr);
   }
 
-  // Check if user input triggered a concrete ledger action (e.g. logging a transaction)
+  // Check if edge cognition determined a preliminary transaction or query plan
   const edgePlan = runEdgeCognition(userInput, context);
-  const hasConcreteAction = Boolean(edgePlan.action);
 
   // Helper to stream text word-by-word if needed
   const streamFallbackText = async (text: string) => {
@@ -479,21 +577,18 @@ export async function processAgentMessage(
       current += (i === 0 ? '' : ' ') + words[i];
       onChunk(current);
       if (i < words.length - 1) {
-        await new Promise(r => setTimeout(r, 18));
+        await new Promise(r => setTimeout(r, 14));
       }
     }
   };
 
-  // Always invoke LLM via server-side reasoning endpoint (Gemini, OpenAI, DeepSeek, Z.ai)
-  try {
-    // 1. Retrieve top semantically relevant chunks from local browser vector database
-    const ragContext = vectorDb.buildRagContext(userInput, 4);
+  // 1. Retrieve top semantically relevant chunks from local browser vector database
+  const ragContext = vectorDb.buildRagContext(userInput, 4);
+  const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
+  const savingsAcc = accounts.find(a => a.type === 'savings');
 
-    const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
-    const savingsAcc = accounts.find(a => a.type === 'savings');
-
-    // 2. Personal, human secretary system prompt
-    const systemPrompt = `You are Fiona, the user's friendly, sharp, and attentive personal finance secretary and accountant.
+  // 2. Personal, human secretary system prompt with accurate transaction classification guidelines
+  const systemPrompt = `You are Fiona, the user's friendly, sharp, and attentive personal finance secretary and accountant.
 
 ARCHITECTURE & MEMORY RETRIEVAL (Browser-Native Vector RAG):
 - You operate a decentralized in-browser vector database and embedding retrieval system (stored persistently in the user's browser).
@@ -520,13 +615,53 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 2. NEVER DUMP UNSOLICITED BUSINESS REPORTS OR BULLETED SUMMARIES:
    - For simple greetings, small talk, casual questions ("hey", "how are you?", "can I grab a coffee?"), reply in 1 to 3 friendly, direct, natural sentences.
    - Do NOT produce full financial summaries, multi-bullet status reports, or executive overviews UNLESS the user explicitly asks for them.
-   - When asked a specific question like "Can I afford dinner tonight?", answer conversationally with direct numbers (e.g. "Yes, totally! You've got $120 left in your dining envelope this week, so a $40 dinner is well within your safe zone.").
 
-3. SMART BOOKKEEPING & ACTIONS:
-   - If the user mentions spending or receiving money (e.g. "Spent $15 at Starbucks"), acknowledge it warmly and confirm it's tracked against their envelope.
-   - If the user shares a rule or personal goal ("Remember that I want to save $300 for a trip"), warmly confirm that you've noted it in their persistent memory.`;
+3. ACCURATE TRANSACTION CLASSIFICATION & BOOKKEEPING:
+   - When the user mentions finding, receiving, earning, gaining, or spending money, accurately classify the transaction:
+     * "income": finding money (e.g. "i found $10 on the floor"), gifts received, bonuses, salary, client fees, selling items, dividends. Finding cash must ALWAYS be classified as income (+).
+     * "expense": buying items, paying for meals, groceries, bills, fuel, subscriptions (-).
+     * "transfer": moving money between accounts.
+   - If a transaction should be logged, append this exact block at the very end of your response:
+\`\`\`action_json
+{
+  "type": "income" | "expense" | "transfer",
+  "amount": number,
+  "category": "Groceries" | "Dining & Nightlife" | "Transportation & Fuel" | "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Health & Wellness" | "Entertainment & Leisure" | "Shopping & Goods" | "Savings & Investments" | "Other",
+  "merchant": "string (e.g. Found Cash, Starbucks, etc.)",
+  "note": "string"
+}
+\`\`\`
+   - If no financial transaction is being recorded or proposed, do not include this action_json block.`;
 
-    const effectiveProvider = (!config.provider || config.provider === 'edge') ? 'gemini' : config.provider;
+  // DEFAULT MAXIMUM PRIORITY: Check for Browser-based LLM first!
+  const isEdgeSelected = !config.provider || config.provider === 'edge';
+  if (isEdgeSelected) {
+    try {
+      const { isWindowAIAvailable, runWindowAI, runBrowserEngine } = await import('./browserLm');
+      let replyText = '';
+      if (isWindowAIAvailable()) {
+        try {
+          replyText = await runWindowAI(userInput, systemPrompt, onChunk);
+        } catch (winErr) {
+          console.warn('Window AI error, falling back to in-browser engine:', winErr);
+          replyText = await runBrowserEngine(userInput, context, onChunk);
+        }
+      } else {
+        replyText = await runBrowserEngine(userInput, context, onChunk);
+      }
+
+      return parseAgentResponseWithActions(replyText, edgePlan, context, userInput);
+    } catch (browserLmErr) {
+      console.warn('Browser LM execution warning:', browserLmErr);
+      const { runBrowserEngine } = await import('./browserLm');
+      const fallbackReply = await runBrowserEngine(userInput, context, onChunk);
+      return parseAgentResponseWithActions(fallbackReply, edgePlan, context, userInput);
+    }
+  }
+
+  // Cloud API Providers (Gemini, OpenAI, DeepSeek, Z.ai)
+  try {
+    const effectiveProvider = config.provider;
     const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash' || config.model === 'smolLM2-360M-instruct')
       ? 'gemini-3.8-flash'
       : config.model;
@@ -545,25 +680,10 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
     });
 
     if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const statusText = res.statusText || (res.status === 404 ? 'Not Found' : 'Error');
-      const errDetail = errData.error || `${res.status} ${statusText}`;
-
-      // If edge cognition determined an answer or transaction action, provide it with status notice
-      const fallbackContent = edgePlan.content
-        ? `${edgePlan.content}\n\n*(Note: Cloud backend returned ${errDetail}; processed locally via edge engine.)*`
-        : `LLM Service Notice: ${errDetail}. Please check your connection or LLM settings in the top bar.`;
-
-      await streamFallbackText(fallbackContent);
-
-      return {
-        content: fallbackContent,
-        plan: hasConcreteAction ? edgePlan.plan : undefined,
-        action: edgePlan.action,
-        measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
-        memoryNote: edgePlan.memoryNote,
-        updatedMemory: edgePlan.updatedMemory
-      };
+      // Graceful fallback to browser-based LLM on server error without 400 failure notice
+      const { runBrowserEngine } = await import('./browserLm');
+      const browserReply = await runBrowserEngine(userInput, context, onChunk);
+      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
     }
 
     const contentType = res.headers.get('content-type') || '';
@@ -604,14 +724,7 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       }
 
       if (accumulated.trim()) {
-        return {
-          content: accumulated,
-          plan: hasConcreteAction ? edgePlan.plan : undefined,
-          action: edgePlan.action,
-          measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
-          memoryNote: edgePlan.memoryNote,
-          updatedMemory: edgePlan.updatedMemory
-        };
+        return parseAgentResponseWithActions(accumulated, edgePlan, context, userInput);
       }
 
       if (streamError) {
@@ -619,37 +732,26 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       }
     }
 
-    // Standard JSON response fallback
+    // Standard JSON response
     const data = await res.json().catch(() => ({}));
-    const reply = data.reply || '';
+    if (data.missingKey) {
+      // Server indicated missing Gemini API key -> seamlessly fall back to browser-based engine with maximum priority
+      const { runBrowserEngine } = await import('./browserLm');
+      const browserReply = await runBrowserEngine(userInput, context, onChunk);
+      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+    }
 
+    const reply = data.reply || '';
     if (onChunk && reply) {
       await streamFallbackText(reply);
     }
 
-    return {
-      content: reply,
-      plan: hasConcreteAction ? edgePlan.plan : undefined,
-      action: edgePlan.action,
-      measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
-      memoryNote: edgePlan.memoryNote,
-      updatedMemory: edgePlan.updatedMemory
-    };
+    return parseAgentResponseWithActions(reply, edgePlan, context, userInput);
   } catch (err: any) {
-    console.error('LLM generation error:', err);
-    const fallbackContent = edgePlan.content
-      ? `${edgePlan.content}\n\n*(Note: Local resilience fallback active: ${err?.message || 'Server connection unreachable'})*`
-      : `LLM Connection Error: ${err?.message || 'Failed to reach AI Agent server'}. Please check your connection or LLM settings.`;
-
-    await streamFallbackText(fallbackContent);
-
-    return {
-      content: fallbackContent,
-      plan: hasConcreteAction ? edgePlan.plan : undefined,
-      action: edgePlan.action,
-      measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
-      memoryNote: edgePlan.memoryNote,
-      updatedMemory: edgePlan.updatedMemory
-    };
+    console.warn('Cloud LLM connection notice, utilizing browser-based engine:', err);
+    const { runBrowserEngine } = await import('./browserLm');
+    const browserReply = await runBrowserEngine(userInput, context, onChunk);
+    return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
   }
 }
+

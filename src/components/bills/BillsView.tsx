@@ -9,7 +9,8 @@ import {
   Sparkles,
   X,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Pencil
 } from 'lucide-react';
 
 // Live Countdown & Progress Bar Component for each bill deadline
@@ -124,8 +125,9 @@ const BillCountdownBar: React.FC<{
 };
 
 export const BillsView: React.FC = () => {
-  const { bills, addBill, toggleBillPaid, deleteBill } = useFinance();
+  const { bills, addBill, updateBill, toggleBillPaid, deleteBill } = useFinance();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingBill, setEditingBill] = useState<Bill | null>(null);
 
   // Form State
   const [name, setName] = useState('');
@@ -138,23 +140,54 @@ export const BillsView: React.FC = () => {
   const unpaidBills = bills.filter(b => !b.isPaidThisCycle);
   const flaggedLeaks = bills.filter(b => b.potentialSavingsNotice);
 
-  const handleAddSubmit = (e: React.FormEvent) => {
+  const openAddModal = () => {
+    setEditingBill(null);
+    setName('');
+    setAmount('');
+    setCategory('Utilities & Services');
+    setDueDate('2026-11-01');
+    setIsAutopay(true);
+    setShowAddModal(true);
+  };
+
+  const openEditModal = (b: Bill) => {
+    setEditingBill(b);
+    setName(b.name);
+    setAmount(b.amount.toString());
+    setCategory(b.category);
+    setDueDate(b.dueDate);
+    setIsAutopay(b.isAutopay);
+    setShowAddModal(true);
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt <= 0 || !name.trim()) return;
 
-    addBill({
-      name: name.trim(),
-      amount: amt,
-      category,
-      frequency: 'monthly',
-      dueDate,
-      isAutopay,
-      isPaidThisCycle: false,
-      status: 'upcoming'
-    });
+    if (editingBill) {
+      updateBill(editingBill.id, {
+        name: name.trim(),
+        amount: amt,
+        category,
+        dueDate,
+        isAutopay
+      });
+    } else {
+      addBill({
+        name: name.trim(),
+        amount: amt,
+        category,
+        frequency: 'monthly',
+        dueDate,
+        isAutopay,
+        isPaidThisCycle: false,
+        status: 'upcoming'
+      });
+    }
 
     setShowAddModal(false);
+    setEditingBill(null);
     setName('');
     setAmount('');
   };
@@ -174,7 +207,7 @@ export const BillsView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={openAddModal}
           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-mono font-semibold transition-all tactile-btn cursor-pointer shadow-xs"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -245,10 +278,17 @@ export const BillsView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm sm:text-base tabular-nums">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm sm:text-base tabular-nums mr-1">
                     ${b.amount.toFixed(2)}
                   </span>
+                  <button
+                    onClick={() => openEditModal(b)}
+                    title={`Edit ${b.name}`}
+                    className="text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 p-1.5 cursor-pointer rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
                   <button
                     onClick={() => deleteBill(b.id)}
                     title={`Delete ${b.name}`}
@@ -275,18 +315,26 @@ export const BillsView: React.FC = () => {
         </div>
       </div>
 
-      {/* ADD BILL MODAL */}
+      {/* ADD / EDIT BILL MODAL */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-150">
           <div className="bg-white dark:bg-[#121216] border border-zinc-200 dark:border-zinc-800 w-full max-w-sm p-5 rounded-3xl shadow-2xl space-y-3 font-mono text-xs">
             <div className="flex items-center justify-between pb-2 border-b border-zinc-100 dark:border-zinc-800">
-              <h2 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">Add Recurring Bill</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer">
+              <h2 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
+                {editingBill ? 'Edit Recurring Bill' : 'Add Recurring Bill'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingBill(null);
+                }}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="space-y-3">
+            <form onSubmit={handleFormSubmit} className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-zinc-600 dark:text-zinc-400 mb-1">NAME</label>
                 <input
@@ -357,7 +405,10 @@ export const BillsView: React.FC = () => {
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingBill(null);
+                  }}
                   className="px-3.5 py-2 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-850"
                 >
                   Cancel
@@ -366,7 +417,7 @@ export const BillsView: React.FC = () => {
                   type="submit"
                   className="px-4 py-2 bg-violet-600 text-white font-semibold rounded-xl cursor-pointer hover:bg-violet-700 shadow-xs"
                 >
-                  Save Bill
+                  {editingBill ? 'Save Changes' : 'Save Bill'}
                 </button>
               </div>
             </form>
