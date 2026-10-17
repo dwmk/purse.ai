@@ -194,7 +194,7 @@ export const TopBar: React.FC = () => {
                 title="SmolLM2-135M neural weights preloaded in browser memory"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Edge AI Preloaded</span>
+                <span>Ready</span>
               </div>
             ) : null}
 
