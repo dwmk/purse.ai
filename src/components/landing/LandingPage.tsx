@@ -266,7 +266,7 @@ footer{border-top:1px solid var(--line);padding:2rem 0;color:var(--mute);font-si
 </div>
 </div></section>
 
-<footer><div class="wrap">Purse Autonomous Finance · MIT License · Made for the 2026 Shenzhen International FinTech Competition</div></footer>` }} />
+<footer><div class="wrap">Purse Finance · 8th Fintechathon 2026</div></footer>` }} />
     </div>
   );
 };

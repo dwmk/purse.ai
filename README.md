@@ -356,6 +356,6 @@ When users instruct the assistant (e.g., *"Remember that I want to save an extra
 
 ---
 
-## License & Attribution
+## Notice
 
-Distributed under the MIT License. Developed for the 2026 Shenzhen International FinTech Competition.
+Developed for the 2026 Shenzhen International FinTech Competition under the International category, option A.
