@@ -298,7 +298,7 @@ export const AgentChatView: React.FC = () => {
   ];
 
   const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];
-  const isCurrentKeyMissing = currentModel.isApiBased && !config.apiKey?.trim();
+  const isCurrentKeyMissing = (currentModel.id === 'openai' || currentModel.id === 'deepseek' || currentModel.id === 'zai') && !config.apiKey?.trim();
 
   const handleSelectModel = (opt: typeof MODEL_OPTIONS[0]) => {
     updateConfig({ provider: opt.id, model: opt.model });

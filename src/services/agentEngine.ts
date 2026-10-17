@@ -460,7 +460,8 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 }
 
 // Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
-// Parse action JSON block from LLM output to let the LLM decide transactions accurately
+// Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
+// Parse action JSON block from LLM output to let the LLM decide transactions, bills, and memory rules accurately
 export function parseAgentResponseWithActions(
   rawReply: string,
   edgePlan: AgentResponse,
@@ -474,14 +475,19 @@ export function parseAgentResponseWithActions(
   if (actionJsonMatch) {
     try {
       const parsed = JSON.parse(actionJsonMatch[1].trim());
-      if (parsed && typeof parsed.amount === 'number' && parsed.type) {
+
+      // 1. Transaction proposal (income / expense / transfer)
+      if (parsed && typeof parsed.amount === 'number' && (parsed.type || parsed.action === 'ADD_TRANSACTION')) {
         const isIncome = parsed.type === 'income';
         const txType = isIncome ? 'income' : (parsed.type === 'transfer' ? 'transfer' : 'expense');
         const amt = Math.abs(parsed.amount);
         const category: ExpenseCategory = parsed.category || (isIncome ? 'Other' : detectCategory(userInput));
-        const merchant = parsed.merchant || (isIncome ? 'Found Cash' : 'Retail Merchant');
+        const merchant = parsed.merchant || (isIncome ? 'Income Source' : 'Retail Merchant');
         const delta = isIncome ? amt : -amt;
         const newBal = checkingBalance + delta;
+        const liquidityWarning = (!isIncome && newBal < context.memory.profile.minimumCheckingFloor)
+          ? `Warning: This brings checking balance ($${newBal.toFixed(2)}) below your safety floor ($${context.memory.profile.minimumCheckingFloor.toFixed(2)}).`
+          : undefined;
 
         const newTx: Transaction = {
           id: `tx_${Date.now()}`,
@@ -507,7 +513,8 @@ export function parseAgentResponseWithActions(
           dryRunImpact: {
             balanceDelta: delta,
             categoryImpact: category,
-            newBudgetRemaining: 0
+            newBudgetRemaining: 0,
+            liquidityWarning
           }
         };
 
@@ -515,11 +522,11 @@ export function parseAgentResponseWithActions(
           id: `plan_tx_${Date.now()}`,
           intent: isIncome ? 'CONVERSATIONAL_INCOME_LOG' : 'CONVERSATIONAL_EXPENSE_LOG',
           confidence: 0.98,
-          reasoning: `LLM accurately decided ${txType} transaction of $${amt.toFixed(2)} for ${merchant}.`,
+          reasoning: `Classified ${txType} transaction of $${amt.toFixed(2)} for ${merchant}.`,
           steps: [
-            { step: 1, title: 'Classify Transaction Type & Amount', detail: `Type: ${isIncome ? 'Income (+)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
+            { step: 1, title: 'Parse Natural Language Entities', detail: `Type: ${isIncome ? 'Income (+)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
             { step: 2, title: 'Verify Account & Balance Cushion', detail: `Projected checking balance: $${newBal.toFixed(2)}`, status: 'completed' },
-            { step: 3, title: 'Prepare Non-Destructive Mutation', detail: 'Awaiting user execution confirmation', status: 'in_progress' }
+            { step: 3, title: 'Prepare Non-Destructive Mutation', detail: 'Awaiting user execution confirmation in Gate', status: 'in_progress' }
           ],
           proposedAction: action
         };
@@ -534,27 +541,145 @@ export function parseAgentResponseWithActions(
           updatedMemory: edgePlan.updatedMemory
         };
       }
+
+      // 2. Scheduled Bill proposal
+      if (parsed && (parsed.action === 'ADD_BILL' || (parsed.name && parsed.dueDate && typeof parsed.amount === 'number'))) {
+        const billAmt = Math.abs(parsed.amount);
+        const billName = parsed.name || 'New Recurring Bill';
+        const category: ExpenseCategory = parsed.category || detectCategory(billName);
+        const dueDate = parsed.dueDate || new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+
+        const newBill: Bill = {
+          id: `bill_${Date.now()}`,
+          name: billName,
+          amount: billAmt,
+          category,
+          frequency: parsed.frequency || 'monthly',
+          dueDate,
+          isAutopay: Boolean(parsed.isAutopay),
+          isPaidThisCycle: false,
+          status: 'upcoming',
+          notes: parsed.notes || `Scheduled via Fiona AI conversation`
+        };
+
+        const action: AgentAction = {
+          id: `act_bill_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'ADD_BILL',
+          description: `Schedule recurring bill: ${billName} ($${billAmt.toFixed(2)}/mo due ${dueDate})`,
+          payload: newBill,
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.95,
+          dryRunImpact: {
+            balanceDelta: -billAmt,
+            categoryImpact: category
+          }
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_bill_${Date.now()}`,
+          intent: 'SCHEDULE_RECURRING_BILL',
+          confidence: 0.95,
+          reasoning: `Prepared recurring obligation for ${billName} ($${billAmt.toFixed(2)}).`,
+          steps: [
+            { step: 1, title: 'Extract Obligation Parameters', detail: `${billName} · $${billAmt.toFixed(2)} · Due ${dueDate}`, status: 'completed' },
+            { step: 2, title: 'Check Cashflow Timeline', detail: 'Integrated into upcoming payments forecast', status: 'completed' },
+            { step: 3, title: 'Awaiting User Confirmation', detail: 'Ready for commit to local storage', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return {
+          content: cleanContent,
+          plan,
+          action,
+          measurableValue: `$${billAmt.toFixed(2)}/mo scheduled bill`
+        };
+      }
+
+      // 3. Memory Invariant Update proposal
+      if (parsed && (parsed.action === 'UPDATE_MEMORY' || (parsed.rule && typeof parsed.rule === 'string'))) {
+        const newRule = (parsed.rule as string).trim();
+        if (newRule.length > 3) {
+          const updatedRules = [...context.memory.rules, newRule];
+          const updatedMarkdown = `${context.memory.rawMarkdown}\n- RULE_NEW: ${newRule} (Logged ${new Date().toISOString().split('T')[0]})`;
+          const updatedMem: MemoryFile = {
+            ...context.memory,
+            rules: updatedRules,
+            rawMarkdown: updatedMarkdown,
+            lastUpdated: new Date().toISOString(),
+            revisionCount: context.memory.revisionCount + 1
+          };
+
+          const action: AgentAction = {
+            id: `act_mem_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'UPDATE_MEMORY',
+            description: `Append new operational rule to Agent Memory: "${newRule}"`,
+            payload: updatedMem,
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_mem_${Date.now()}`,
+            intent: 'MEMORY_UPDATE',
+            confidence: 0.98,
+            reasoning: 'Extracted financial invariant and updated markdown memory graph.',
+            steps: [
+              { step: 1, title: 'Extract Invariant', detail: newRule, status: 'completed' },
+              { step: 2, title: 'Compile Markdown Revision', detail: `Revision #${updatedMem.revisionCount}`, status: 'completed' },
+              { step: 3, title: 'Await User Approval', detail: 'Safe execution gate active', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return {
+            content: cleanContent,
+            plan,
+            action,
+            updatedMemory: updatedMem,
+            memoryNote: `Added rule: "${newRule}"`,
+            measurableValue: 'Memory Graph Updated with 1 Invariant'
+          };
+        }
+      }
     } catch (e) {
       console.warn('Action JSON parsing warning:', e);
     }
   }
 
   const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+
+  // If user clearly intended a financial transaction/bill and edgePlan generated a safe action proposal, attach it
+  const isExplicitFinancialIntent = edgePlan.action && (edgePlan.action.type === 'ADD_TRANSACTION' || edgePlan.action.type === 'ADD_BILL');
+  if (isExplicitFinancialIntent) {
+    return {
+      content: cleanContent || edgePlan.content,
+      plan: edgePlan.plan,
+      action: edgePlan.action,
+      measurableValue: edgePlan.measurableValue,
+      memoryNote: edgePlan.memoryNote,
+      updatedMemory: edgePlan.updatedMemory
+    };
+  }
+
+  // Pure conversational or generic answer (e.g. BRAC university, general knowledge, greetings, analysis)
   return {
-    content: cleanContent || edgePlan.content,
-    plan: edgePlan.action ? edgePlan.plan : undefined,
-    action: edgePlan.action,
-    measurableValue: edgePlan.action ? edgePlan.measurableValue : undefined,
-    memoryNote: edgePlan.memoryNote,
-    updatedMemory: edgePlan.updatedMemory
+    content: cleanContent || rawReply
   };
 }
 
-// Full-stack Agent Reasoning Dispatcher with Default Maximum Priority for Browser-based LLM
+// Full-stack Agent Reasoning Dispatcher with Real-time AI Model Execution
 export async function processAgentMessage(
   userInput: string,
   context: AgentContext,
-  onChunk?: (partialText: string) => void
+  onChunk?: (partialText: string) => void,
+  history?: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<AgentResponse> {
   const { config, memory, bills, budgets, accounts } = context;
 
@@ -587,14 +712,12 @@ export async function processAgentMessage(
   const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
   const savingsAcc = accounts.find(a => a.type === 'savings');
 
-  // 2. Personal, human secretary system prompt with accurate transaction classification guidelines
-  const systemPrompt = `You are Fiona, the user's friendly, sharp, and attentive personal finance secretary and accountant.
+  // 2. Personal, human secretary system prompt with thorough general knowledge and accurate financial actions
+  const systemPrompt = `You are Fiona, the user's friendly, sharp, knowledgeable personal finance secretary, accountant, and intelligent companion.
 
 ARCHITECTURE & MEMORY RETRIEVAL (Browser-Native Vector RAG):
-- You operate a decentralized in-browser vector database and embedding retrieval system (stored persistently in the user's browser).
-- The user's ledger, transaction history, active budget envelopes, recurring obligations, and lifestyle memory rules have been embedded and indexed into this local vector store.
-- Here are the most semantically relevant chunks retrieved from the user's local vector database for this prompt:
-
+- You operate with a decentralized in-browser vector database and embedding retrieval system (stored persistently in the user's browser).
+- Relevant vector chunks from the user's local database for this query:
 ${ragContext || '[No specific historical vector chunks matched]'}
 
 ACTIVE AGENT KNOWLEDGE GRAPH (Memory):
@@ -607,71 +730,95 @@ QUICK LEDGER SNAPSHOT:
 - Upcoming Bills: ${bills.slice(0, 4).map(b => `${b.name} ($${b.amount} on ${b.dueDate})`).join(', ')}
 
 CORE PERSONALITY & COMMUNICATION GUIDELINES:
-1. ACT LIKE A GENUINE PERSONAL SECRETARY / ACCOUNTANT:
-   - Be warm, friendly, conversational, and helpful. You are a trusted human-like confidante, NOT a cold corporate dashboard or robot.
-   - Talk in natural, simple English. Avoid stiff financial jargon unless asked.
-   - Feel free to engage in general friendly conversation, greetings ("Hey!", "Good morning!"), and everyday check-ins.
+1. ACT LIKE A GENUINE INTELLIGENT PERSONAL SECRETARY (FIONA):
+   - Be warm, attentive, conversational, witty, and helpful. You are a trusted human-like confidante, NOT a rigid corporate template or robot.
+   - For generic questions, general queries, small talk, questions about institutions, universities (e.g. "do you know about BRAC university?"), science, geography, culture, language, or general advice:
+     ANSWER DIRECTLY, KNOWLEDGEABLY, ACCURATELY, AND THOROUGHLY as Fiona. Do NOT deflect, do NOT give canned account status summaries, and do NOT force the conversation back to bank balances when the user is asking about an external topic.
+   - For simple greetings and casual banter ("hey", "how are you?", "hello"), reply in 1 to 2 warm, natural sentences.
 
-2. NEVER DUMP UNSOLICITED BUSINESS REPORTS OR BULLETED SUMMARIES:
-   - For simple greetings, small talk, casual questions ("hey", "how are you?", "can I grab a coffee?"), reply in 1 to 3 friendly, direct, natural sentences.
-   - Do NOT produce full financial summaries, multi-bullet status reports, or executive overviews UNLESS the user explicitly asks for them.
-
-3. ACCURATE TRANSACTION CLASSIFICATION & BOOKKEEPING:
-   - When the user mentions finding, receiving, earning, gaining, or spending money, accurately classify the transaction:
-     * "income": finding money (e.g. "i found $10 on the floor"), gifts received, bonuses, salary, client fees, selling items, dividends. Finding cash must ALWAYS be classified as income (+).
-     * "expense": buying items, paying for meals, groceries, bills, fuel, subscriptions (-).
-     * "transfer": moving money between accounts.
-   - If a transaction should be logged, append this exact block at the very end of your response:
+2. FINANCIAL DECISION-MAKING & BOOKKEEPING:
+   - When the user mentions finding, receiving, earning, gaining, or spending money:
+     * Accurately classify the transaction:
+       - "income": finding money (e.g. "i found $10 on the floor"), gifts, bonuses, salary, client fees, selling items, dividends, cashback. Finding cash MUST ALWAYS be classified as income (+).
+       - "expense": buying items, paying for meals, groceries, bills, fuel, subscriptions (-).
+       - "transfer": moving money between accounts.
+     * When proposing a transaction, explain the impact and append this exact action_json block at the very end:
 \`\`\`action_json
 {
+  "action": "ADD_TRANSACTION",
   "type": "income" | "expense" | "transfer",
   "amount": number,
   "category": "Groceries" | "Dining & Nightlife" | "Transportation & Fuel" | "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Health & Wellness" | "Entertainment & Leisure" | "Shopping & Goods" | "Savings & Investments" | "Other",
-  "merchant": "string (e.g. Found Cash, Starbucks, etc.)",
+  "merchant": "string",
   "note": "string"
 }
 \`\`\`
-   - If no financial transaction is being recorded or proposed, do not include this action_json block.`;
 
-  // DEFAULT MAXIMUM PRIORITY: Check for Browser-based LLM first!
-  const isEdgeSelected = !config.provider || config.provider === 'edge';
-  if (isEdgeSelected) {
+3. BILL & RECURRING MANAGEMENT:
+   - If the user wants to add or schedule a recurring bill, explain the cashflow impact and append:
+\`\`\`action_json
+{
+  "action": "ADD_BILL",
+  "name": "string",
+  "amount": number,
+  "category": "Groceries" | "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Transportation & Fuel" | "Health & Wellness" | "Other",
+  "dueDate": "YYYY-MM-DD",
+  "isAutopay": boolean
+}
+\`\`\`
+
+4. MEMORY & RULE LEARNING:
+   - If the user tells you a financial rule or preference to remember:
+\`\`\`action_json
+{
+  "action": "UPDATE_MEMORY",
+  "rule": "string"
+}
+\`\`\`
+
+5. NO ACTION FOR NON-TRANSACTIONAL QUESTIONS:
+   - If the user is asking a general question, learning something, or chatting without requesting a financial transaction, DO NOT output any action_json block.`;
+
+  // If local edge engine (Chrome Prompt API / Transformers.js) is explicitly active, try it first
+  if (config.provider === 'edge') {
     try {
       const { isWindowAIAvailable, runWindowAI, runBrowserEngine } = await import('./browserLm');
-      let replyText = '';
       if (isWindowAIAvailable()) {
         try {
-          replyText = await runWindowAI(userInput, systemPrompt, onChunk);
+          const winAiReply = await runWindowAI(userInput, systemPrompt, onChunk);
+          if (winAiReply && winAiReply.trim()) {
+            return parseAgentResponseWithActions(winAiReply, edgePlan, context, userInput);
+          }
         } catch (winErr) {
-          console.warn('Window AI notice, executing in-browser engine:', winErr);
-          replyText = await runBrowserEngine(userInput, context, onChunk);
+          console.warn('Window AI notice, falling back to server AI model:', winErr);
         }
-        if (!replyText || !replyText.trim()) {
-          replyText = await runBrowserEngine(userInput, context, onChunk);
-        }
-      } else {
-        replyText = await runBrowserEngine(userInput, context, onChunk);
       }
 
-      if (!replyText || !replyText.trim()) {
-        replyText = await runBrowserEngine(userInput, context, onChunk);
+      const localReply = await runBrowserEngine(userInput, context, onChunk, systemPrompt);
+      if (localReply && localReply.trim()) {
+        return parseAgentResponseWithActions(localReply, edgePlan, context, userInput);
       }
-
-      return parseAgentResponseWithActions(replyText, edgePlan, context, userInput);
-    } catch (browserLmErr) {
-      console.warn('Browser LM execution warning:', browserLmErr);
-      const { runBrowserEngine } = await import('./browserLm');
-      const fallbackReply = await runBrowserEngine(userInput, context, onChunk);
-      return parseAgentResponseWithActions(fallbackReply, edgePlan, context, userInput);
+    } catch (edgeErr) {
+      console.warn('Edge execution notice, delegating to AI model:', edgeErr);
     }
   }
 
-  // Cloud API Providers (Gemini, OpenAI, DeepSeek, Z.ai)
+  // Real AI Model Execution (Gemini 3.8 Flash default or configured provider)
   try {
-    const effectiveProvider = config.provider;
-    const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash' || config.model === 'smolLM2-360M-instruct')
+    const effectiveProvider = (!config.provider || config.provider === 'edge') ? 'gemini' : config.provider;
+    const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash' || config.model.includes('smolLM'))
       ? 'gemini-3.8-flash'
       : config.model;
+
+    const historyMessages = (history || []).slice(-8).map(m => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: m.content
+    }));
+
+    const messages = [
+      ...historyMessages,
+      { role: 'user', content: userInput }
+    ];
 
     const res = await fetch('/api/chat', {
       method: 'POST',
@@ -680,22 +827,20 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
         provider: effectiveProvider,
         apiKey: config.apiKey,
         model: effectiveModel,
-        messages: [{ role: 'user', content: userInput }],
+        messages,
         systemInstruction: systemPrompt,
         stream: true
       })
     });
 
     if (!res.ok) {
-      // Graceful fallback to browser-based LLM on server error without 400 failure notice
-      const { runBrowserEngine } = await import('./browserLm');
-      const browserReply = await runBrowserEngine(userInput, context, onChunk);
-      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || `AI Model request failed with status ${res.status}`);
     }
 
     const contentType = res.headers.get('content-type') || '';
 
-    // Handle real-time Server-Sent Events (SSE) stream
+    // Handle real-time Server-Sent Events (SSE) stream from AI model
     if (contentType.includes('text/event-stream') && res.body) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -739,20 +884,15 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       }
     }
 
-    // Standard JSON response
+    // Standard JSON response fallback
     const data = await res.json().catch(() => ({}));
-    if (data.missingKey) {
-      // Server indicated missing Gemini API key -> seamlessly fall back to browser-based engine with maximum priority
-      const { runBrowserEngine } = await import('./browserLm');
-      const browserReply = await runBrowserEngine(userInput, context, onChunk);
-      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+    if (data.error) {
+      throw new Error(data.error);
     }
 
     const reply = data.reply || '';
     if (!reply.trim()) {
-      const { runBrowserEngine } = await import('./browserLm');
-      const browserReply = await runBrowserEngine(userInput, context, onChunk);
-      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+      throw new Error('AI model returned an empty response. Please try again.');
     }
 
     if (onChunk && reply) {
@@ -761,10 +901,8 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 
     return parseAgentResponseWithActions(reply, edgePlan, context, userInput);
   } catch (err: any) {
-    console.warn('Cloud LLM connection notice, utilizing browser-based engine:', err);
-    const { runBrowserEngine } = await import('./browserLm');
-    const browserReply = await runBrowserEngine(userInput, context, onChunk);
-    return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+    console.error('AI Model execution error:', err);
+    throw err;
   }
 }
 

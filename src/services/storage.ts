@@ -422,8 +422,8 @@ export const SEED_MEMORY_FILE: MemoryFile = {
 };
 
 export const SEED_CONFIG: LLMConfig = {
-  provider: 'edge', // Prioritize browser-based LLM first
-  model: 'smolLM2-360M-instruct',
+  provider: 'edge', // Default AI model: Browser-based LLM with max priority
+  model: 'onnx-community/SmolLM2-135M-Instruct-ONNX',
   useEdgeFallback: true,
   autoApproveSafeActions: false
 };
@@ -665,8 +665,10 @@ export const StorageService = {
       const parsed = JSON.parse(raw);
       if (!parsed.provider) {
         parsed.provider = 'edge';
-        parsed.model = 'smolLM2-360M-instruct';
-        parsed.useEdgeFallback = true;
+        parsed.model = 'onnx-community/SmolLM2-135M-Instruct-ONNX';
+        localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed));
+      } else if (parsed.provider === 'edge' && (!parsed.model || parsed.model.includes('360M') || !parsed.model.includes('-ONNX'))) {
+        parsed.model = 'onnx-community/SmolLM2-135M-Instruct-ONNX';
         localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed));
       }
       return { ...SEED_CONFIG, ...parsed };

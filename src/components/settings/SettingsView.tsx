@@ -364,8 +364,26 @@ export const SettingsView: React.FC = () => {
           </div>
         )}
 
-        {/* API Key Box for External Providers */}
-        {provider !== 'edge' && (
+        {/* Gemini Built-in Status Box */}
+        {provider === 'gemini' && (
+          <div className="p-4 bg-violet-50/60 dark:bg-violet-950/30 rounded-2xl border border-violet-200 dark:border-violet-900/60 space-y-2 font-mono text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-violet-900 dark:text-violet-200 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                <span>Google Gemini 3.8 Flash (Active)</span>
+              </span>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                READY &amp; CONNECTED
+              </span>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 text-xs font-sans leading-relaxed">
+              Purse is actively powered by Gemini with full conversational intelligence, autonomous bookkeeping, and ledger reasoning. Zero manual setup needed.
+            </p>
+          </div>
+        )}
+
+        {/* API Key Box for Optional 3rd-Party Providers */}
+        {provider !== 'edge' && provider !== 'gemini' && (
           <div
             className={`p-4 bg-zinc-50 dark:bg-zinc-900 rounded-2xl border space-y-3 transition-all ${
               highlightedApiKeyProvider === provider

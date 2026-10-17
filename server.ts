@@ -162,7 +162,7 @@ async function startServer() {
           parts: [{ text: m.content }]
         }));
 
-        const selectedModel = (!model || model === 'gemini-flash-latest' || model === 'gemini-2.5-flash')
+        const selectedModel = (!model || model === 'gemini-flash-latest' || model === 'gemini-2.5-flash' || model.includes('smolLM'))
           ? 'gemini-3.8-flash'
           : model;
 
@@ -202,28 +202,29 @@ async function startServer() {
             res.end();
             return;
           } catch (streamErr: any) {
-            console.warn('Gemini generateContentStream error:', streamErr?.message || streamErr);
-            try {
-              const fallbackResponse = await client.models.generateContent({
-                model: selectedModel,
-                contents,
-                config: {
-                  systemInstruction: systemInstruction || undefined,
-                  temperature,
+            for (const fallbackModel of ['gemini-2.5-flash', 'gemini-3.1-flash-lite']) {
+              try {
+                const fallbackResponse = await client.models.generateContent({
+                  model: fallbackModel,
+                  contents,
+                  config: {
+                    systemInstruction: systemInstruction || undefined,
+                    temperature,
+                  }
+                });
+                const replyText = fallbackResponse.text || '';
+                if (replyText) {
+                  res.write(`data: ${JSON.stringify({ text: replyText })}\n\n`);
+                  res.write(`data: [DONE]\n\n`);
+                  if (typeof (res as any).flush === 'function') {
+                    (res as any).flush();
+                  }
+                  res.end();
+                  return;
                 }
-              });
-              const replyText = fallbackResponse.text || '';
-              if (replyText) {
-                res.write(`data: ${JSON.stringify({ text: replyText })}\n\n`);
-                res.write(`data: [DONE]\n\n`);
-                if (typeof (res as any).flush === 'function') {
-                  (res as any).flush();
-                }
-                res.end();
-                return;
+              } catch (fallbackErr: any) {
+                console.warn(`Gemini fallback ${fallbackModel} attempt error:`, fallbackErr?.message || fallbackErr);
               }
-            } catch (fallbackErr: any) {
-              console.warn('Gemini fallback attempt error:', fallbackErr?.message || fallbackErr);
             }
 
             res.write(`data: ${JSON.stringify({ error: streamErr?.message || 'Streaming failed' })}\n\n`);
@@ -235,10 +236,12 @@ async function startServer() {
         let reply = '';
         let lastErr: any = null;
 
-        for (let attempt = 0; attempt < 3; attempt++) {
+        const modelCandidates = [selectedModel, 'gemini-2.5-flash', 'gemini-3.1-flash-lite'];
+        for (let attempt = 0; attempt < modelCandidates.length; attempt++) {
           try {
+            const currentModelCandidate = modelCandidates[attempt];
             const response = await client.models.generateContent({
-              model: selectedModel,
+              model: currentModelCandidate,
               contents,
               config: {
                 systemInstruction: systemInstruction || undefined,
@@ -249,8 +252,8 @@ async function startServer() {
             break;
           } catch (err: any) {
             lastErr = err;
-            console.warn(`Gemini generateContent attempt ${attempt + 1} failed:`, err?.message || err);
-            if (attempt < 2) {
+            console.warn(`Gemini generateContent attempt ${attempt + 1} (${modelCandidates[attempt]}) failed:`, err?.message || err);
+            if (attempt < modelCandidates.length - 1) {
               await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
             }
           }

@@ -675,6 +675,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setConversations(prev => prev.map(c => c.id === targetConv.id ? updatedConvStreaming : c));
 
     try {
+      const recentHistory = targetConv.messages
+        .filter(m => (m.sender === 'user' || m.sender === 'agent') && m.content)
+        .slice(-8)
+        .map(m => ({
+          role: m.sender === 'user' ? ('user' as const) : ('assistant' as const),
+          content: m.content
+        }));
+
       const response = await processAgentMessage(
         userInput,
         {
@@ -694,7 +702,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
               messages: c.messages.map(m => m.id === agentMsgId ? { ...m, content: partialText } : m)
             };
           }));
-        }
+        },
+        recentHistory
       );
 
       if (response.action) {
