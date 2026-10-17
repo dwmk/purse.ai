@@ -53,16 +53,21 @@ export const FionaAvatar: React.FC = () => {
   // Fiona is visible whenever 3D mode is active and not on landing
   const isVisible = is3DMode && currentView !== 'landing';
 
-  // Sizing and camera framing helper: zoomed out and lowered to be waist-length visible
+  // Sizing and camera framing helper: accurate 1:1 aspect ratio matching rendered canvas
   const updateDimensions = useCallback(() => {
-    if (!containerRef.current || !rendererRef.current || !cameraRef.current) return;
-    const width = containerRef.current.clientWidth || 300;
-    const height = containerRef.current.clientHeight || 400;
+    if (!canvasRef.current || !rendererRef.current || !cameraRef.current) return;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
 
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    rendererRef.current.setPixelRatio(pixelRatio);
     rendererRef.current.setSize(width, height, false);
-    cameraRef.current.aspect = width / height;
 
+    cameraRef.current.aspect = width / height;
     cameraRef.current.fov = 30;
+
     if (isChatView) {
       // Zoomed-out waist-length portrait framing in Chat view (framed comfortably lower)
       const isMobile = width < 640;
@@ -215,7 +220,7 @@ export const FionaAvatar: React.FC = () => {
           cachedGLTF = gltf;
           try {
             VRMUtils.removeUnnecessaryVertices(gltf.scene);
-            VRMUtils.removeUnnecessaryJoints(gltf.scene);
+            VRMUtils.combineSkeletons(gltf.scene);
           } catch (cleanErr) {
             console.warn('VRM cleanup notice:', cleanErr);
           }
@@ -350,10 +355,17 @@ export const FionaAvatar: React.FC = () => {
   // Update canvas sizing whenever view changes or container resizes
   useEffect(() => {
     updateDimensions();
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver(updateDimensions);
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    window.addEventListener('resize', updateDimensions);
+    const observer = new ResizeObserver(() => {
+      updateDimensions();
+    });
+    if (containerRef.current) observer.observe(containerRef.current);
+    if (canvasRef.current) observer.observe(canvasRef.current);
+
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      observer.disconnect();
+    };
   }, [updateDimensions, isVisible]);
 
   // Pointer event handlers: rotate on drag, spring back to center on release
@@ -408,8 +420,8 @@ export const FionaAvatar: React.FC = () => {
           isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         } ${
           isChatView
-        ? 'fixed inset-0 top-16 pb-20 z-20 max-w-[640px] mx-auto flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
-        : 'fixed bottom-16 sm:bottom-6 left-4 sm:left-6 w-44 h-64 sm:w-56 sm:h-80 z-30 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 transition-transform'
+            ? 'fixed top-16 bottom-20 inset-x-0 z-20 flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
+            : 'fixed bottom-16 sm:bottom-6 left-4 sm:left-6 w-44 h-64 sm:w-56 sm:h-80 z-30 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 transition-transform'
         }`}
         title={
           isChatView
@@ -417,75 +429,71 @@ export const FionaAvatar: React.FC = () => {
             : 'Fiona 3D Companion · Tap to return to Chat'
         }
       >
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full block bg-transparent"
-        />
+        <div className={`relative flex items-center justify-center ${
+          isChatView
+            ? 'w-full max-w-[520px] h-full max-h-[720px]'
+            : 'w-full h-full'
+        }`}>
+          <canvas
+            ref={canvasRef}
+            className="w-full h-full block bg-transparent"
+          />
 
-        {/* Loading Spinner */}
-        {isVisible && isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-mono text-violet-600 dark:text-violet-400 pointer-events-none p-4 text-center">
-            <Loader2 className="w-8 h-8 animate-spin mb-2 text-violet-600 dark:text-violet-400" />
-            <span className="font-semibold text-xs">{loadProgress}</span>
-          </div>
-        )}
+          {/* Loading Spinner */}
+          {isVisible && isLoading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-mono text-violet-600 dark:text-violet-400 pointer-events-none p-4 text-center">
+              <Loader2 className="w-8 h-8 animate-spin mb-2 text-violet-600 dark:text-violet-400" />
+              <span className="font-semibold text-xs">{loadProgress}</span>
+            </div>
+          )}
 
-        {/* Error Fallback Notice with Retry Button */}
-        {isVisible && hasError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-mono text-rose-500 p-4 text-center bg-white/80 dark:bg-zinc-950/80 rounded-2xl">
-            <span className="font-semibold">{errorMessage || 'Unable to load 3D model'}</span>
+          {/* Error Fallback Notice with Retry Button */}
+          {isVisible && hasError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-xs font-mono text-rose-500 p-4 text-center bg-white/80 dark:bg-zinc-950/80 rounded-2xl">
+              <span className="font-semibold">{errorMessage || 'Unable to load 3D model'}</span>
+              <button
+                onClick={handleRetry}
+                className="mt-2 px-3 py-1 bg-violet-600 text-white rounded-lg flex items-center gap-1.5 text-[11px] cursor-pointer hover:bg-violet-700"
+              >
+                <RefreshCw className="w-3 h-3" />
+                <span>Retry</span>
+              </button>
+            </div>
+          )}
+
+          {/* Floating PIP Back-to-Chat Button (Only when navigating away from chat view) */}
+          {isVisible && !isChatView && !isLoading && !hasError && (
             <button
-              onClick={handleRetry}
-              className="mt-2 px-3 py-1 bg-violet-600 text-white rounded-lg flex items-center gap-1.5 text-[11px] cursor-pointer hover:bg-violet-700"
+              onClick={() => setCurrentView('chat')}
+              className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-800 text-violet-600 dark:text-violet-400 shadow-md border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer opacity-85 hover:opacity-100"
+              title="Expand to Full Chat View"
             >
-              <RefreshCw className="w-3 h-3" />
-              <span>Retry</span>
+              <Maximize2 className="w-3.5 h-3.5" />
             </button>
-          </div>
-        )}
+          )}
 
-        {/* Floating PIP Back-to-Chat Button (Only when navigating away from chat view) */}
-        {isVisible && !isChatView && !isLoading && !hasError && (
-          <button
-            onClick={() => setCurrentView('chat')}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-800 text-violet-600 dark:text-violet-400 shadow-md border border-zinc-200 dark:border-zinc-800 transition-all cursor-pointer opacity-85 hover:opacity-100"
-            title="Expand to Full Chat View"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
-        )}
-
-        {/* Rotation Hint Overlay in Full View */}
-        {isVisible && isChatView && !isLoading && !hasError && (
-          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/85 dark:bg-zinc-900/85 border border-zinc-200 dark:border-zinc-800 text-[11px] font-mono text-zinc-600 dark:text-zinc-300 pointer-events-none shadow-sm flex items-center gap-1.5 opacity-80 backdrop-blur-xs">
-            <RotateCcw className="w-3 h-3 text-violet-500" />
-            <span>Drag to rotate · Releases to center</span>
-          </div>
-        )}
+          {/* Rotation Hint Overlay in Full View */}
+          {isVisible && isChatView && !isLoading && !hasError && (
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/85 dark:bg-zinc-900/85 border border-zinc-200 dark:border-zinc-800 text-[11px] font-mono text-zinc-600 dark:text-zinc-300 pointer-events-none shadow-sm flex items-center gap-1.5 opacity-80 backdrop-blur-xs">
+              <RotateCcw className="w-3 h-3 text-violet-500" />
+              <span>Drag to rotate · Releases to center</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Subtitles: Shown ONLY when 3D mode is active, showing spoken words with current word highlighted */}
-      {is3DMode && Boolean(activeSubtitle) && (
-        <div className="fixed bottom-24 sm:bottom-20 left-1/2 -translate-x-1/2 z-50 max-w-lg w-[90%] pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-150">
-          <div className="bg-zinc-950/92 dark:bg-zinc-900/95 text-white px-5 py-2.5 rounded-full border border-violet-500/40 shadow-2xl backdrop-blur-md flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-sans font-medium">
+      {/* Subtitles: Shown ONLY when 3D mode is active, rendered with stable geometry to avoid elastic banding */}
+      {is3DMode && (
+        <div
+          className={`fixed bottom-24 sm:bottom-20 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-lg pointer-events-none transition-all duration-200 ease-out ${
+            activeSubtitle ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-2 scale-95 pointer-events-none'
+          }`}
+        >
+          <div className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-zinc-950/90 dark:bg-zinc-900/95 text-white border border-violet-500/35 shadow-2xl backdrop-blur-md flex items-center justify-center gap-3 text-center">
             <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse shrink-0" />
-            <div className="truncate text-balance text-zinc-100 font-medium flex items-center justify-center gap-1.5 flex-wrap">
-              {activeSubtitle.split(/\s+/).filter(Boolean).map((word, idx, arr) => {
-                const isCurrentWord = idx === arr.length - 1;
-                return (
-                  <span
-                    key={idx}
-                    className={
-                      isCurrentWord
-                        ? 'text-violet-300 font-bold bg-violet-600/30 px-1.5 py-0.5 rounded-md border border-violet-400/30 shadow-xs'
-                        : 'text-zinc-300'
-                    }
-                  >
-                    {word}
-                  </span>
-                );
-              })}
-            </div>
+            <p className="text-xs sm:text-sm font-sans font-medium text-zinc-100 leading-snug tracking-normal line-clamp-2">
+              {activeSubtitle}
+            </p>
           </div>
         </div>
       )}

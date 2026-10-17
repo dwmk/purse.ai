@@ -42,7 +42,8 @@ export const AgentChatView: React.FC = () => {
     accounts,
     config,
     updateConfig,
-    openSettingsForProvider
+    openSettingsForProvider,
+    showNotification
   } = useFinance();
 
   const [input, setInput] = useState('');
@@ -60,7 +61,7 @@ export const AgentChatView: React.FC = () => {
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: isGenerating ? 'auto' : 'smooth' });
   };
 
   useEffect(() => {
@@ -90,19 +91,71 @@ export const AgentChatView: React.FC = () => {
     };
   }, []);
 
-  // Web Speech API: Start / Stop Voice Input
-  const toggleSpeechToText = () => {
+  // Web Speech API: Start / Stop Voice Input with permission check & notification
+  const toggleSpeechToText = async () => {
     if (isListening) {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch {}
       }
       setIsListening(false);
       return;
     }
 
     if (!SpeechService.isSttSupported()) {
-      alert('Speech Recognition is not supported in this browser. Please type your message.');
+      showNotification('error', 'Speech recognition is not supported in this browser. Please type your message.');
       return;
+    }
+
+    // Verify microphone availability and permissions
+    if (typeof navigator !== 'undefined') {
+      // 1. Check Permissions API if supported
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const perm = await navigator.permissions.query({ name: 'microphone' as any });
+          if (perm.state === 'denied') {
+            setIsListening(false);
+            showNotification('error', 'Microphone access not provided. Please enable microphone permissions in your browser settings.');
+            return;
+          }
+        } catch {}
+      }
+
+      // 2. Check device enumeration to see if mic exists
+      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+          if (devices.length > 0 && audioInputs.length === 0) {
+            setIsListening(false);
+            showNotification('error', 'Microphone not found. No audio input device detected on your system.');
+            return;
+          }
+        } catch {}
+      }
+
+      // 3. Request audio stream to test mic access
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          stream.getTracks().forEach(track => track.stop());
+        } catch (mediaErr: any) {
+          console.warn('Microphone permission check failed:', mediaErr);
+          setIsListening(false);
+          const errName = mediaErr.name || '';
+          if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError' || mediaErr.message?.includes('Permission denied')) {
+            showNotification('error', 'Microphone access not provided. Please allow microphone permissions to speak to Fiona.');
+            return;
+          } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError' || mediaErr.message?.includes('Requested device not found')) {
+            showNotification('error', 'Microphone not found. Please connect an audio input device or type your message.');
+            return;
+          } else {
+            showNotification('error', `Microphone notice: ${mediaErr.message || 'Access not provided'}.`);
+            return;
+          }
+        }
+      }
     }
 
     try {
@@ -114,8 +167,17 @@ export const AgentChatView: React.FC = () => {
         () => {
           setIsListening(false);
         },
-        () => {
+        (errCode: string) => {
           setIsListening(false);
+          if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+            showNotification('error', 'Microphone access not provided. Please grant microphone permissions in your browser to speak.');
+          } else if (errCode === 'audio-capture') {
+            showNotification('error', 'Microphone not found. No audio input device detected.');
+          } else if (errCode === 'network') {
+            showNotification('error', 'Network error during speech recognition. Please check your internet connection.');
+          } else if (errCode && errCode !== 'no-speech' && errCode !== 'aborted') {
+            showNotification('error', `Speech recognition error: ${errCode}. Please try again or type.`);
+          }
         }
       );
 
@@ -123,10 +185,13 @@ export const AgentChatView: React.FC = () => {
         recognitionRef.current = recognition;
         recognition.start();
         setIsListening(true);
+      } else {
+        showNotification('error', 'Microphone speech recognition is not supported or not available in this browser.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Microphone error:', err);
       setIsListening(false);
+      showNotification('error', 'Microphone access not provided or device not found.');
     }
   };
 
@@ -231,9 +296,21 @@ export const AgentChatView: React.FC = () => {
                         : 'bg-white dark:bg-[#121216] text-zinc-900 dark:text-zinc-100 rounded-bl-xs border border-zinc-200/80 dark:border-zinc-800 shadow-xs'
                     }`}
                   >
-                    {/* Properly Rendered Rich Markdown Content */}
+                    {/* Properly Rendered Rich Markdown Content with Real-time Streaming Cursor */}
                     <div className="leading-relaxed">
-                      <MarkdownContent content={msg.content} />
+                      {msg.content ? (
+                        <div className="relative">
+                          <MarkdownContent content={msg.content} />
+                          {isGenerating && !isUser && msg.id === chatMessages[chatMessages.length - 1]?.id && (
+                            <span className="inline-block w-1.5 h-3.5 bg-violet-500 animate-pulse ml-1 align-middle rounded-xs" />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 py-1 text-zinc-400 dark:text-zinc-500 font-mono text-xs">
+                          <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
+                          <span>Fiona is thinking...</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Agent Audio Speak Button */}
@@ -283,66 +360,100 @@ export const AgentChatView: React.FC = () => {
                     )}
 
                     {/* Safe Execution Proposal Gate Card */}
-                    {msg.action && (
-                      <div className="mt-3.5 p-4 bg-zinc-50 dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 font-mono text-xs space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 font-bold text-zinc-900 dark:text-zinc-100">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>Execution Gate</span>
-                          </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-700 dark:bg-violet-950/80 dark:text-violet-300">
-                            {msg.action.status.toUpperCase()}
-                          </span>
-                        </div>
+                    {/* Safe Execution Proposal Gate Card */}
+                    {msg.action && (() => {
+                      const isTx = msg.action.type === 'ADD_TRANSACTION';
+                      const isIncome = isTx && msg.action.payload?.type === 'income';
+                      const isExpense = isTx && msg.action.payload?.type === 'expense';
+                      const txAmount = isTx ? msg.action.payload?.amount : null;
 
-                        <p className="text-zinc-700 dark:text-zinc-300 text-xs font-sans">
-                          {msg.action.description}
-                        </p>
-
-                        {msg.action.dryRunImpact?.liquidityWarning && (
-                          <div className="flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 font-medium">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                            <span>{msg.action.dryRunImpact.liquidityWarning}</span>
-                          </div>
-                        )}
-
-                        {/* Action Execution Buttons */}
-                        <div className="pt-1 flex items-center gap-2">
-                          {msg.action.status === 'pending' && (
-                            <>
-                              <button
-                                onClick={() => msg.action && applyAction(msg.action.id)}
-                                className="flex-1 py-2 bg-violet-600 hover:bg-violet-700 text-white font-semibold rounded-lg text-xs transition-colors tactile-btn cursor-pointer shadow-xs"
-                              >
-                                Approve &amp; Record
-                              </button>
-                              <button
-                                onClick={() => msg.action && rejectAction(msg.action.id)}
-                                className="px-3.5 py-2 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-xs transition-colors cursor-pointer"
-                              >
-                                Dismiss
-                              </button>
-                            </>
-                          )}
-
-                          {msg.action.status === 'applied' && (
-                            <div className="flex items-center justify-between w-full pt-1">
-                              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Committed to Browser Storage</span>
+                      return (
+                        <div className={`mt-3.5 p-4 rounded-xl border font-mono text-xs space-y-2.5 ${
+                          isIncome
+                            ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                            : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 font-bold text-zinc-900 dark:text-zinc-100">
+                              <ShieldCheck className={`w-4 h-4 ${isIncome ? 'text-emerald-500' : 'text-violet-500'}`} />
+                              <span>Execution Gate</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {isIncome && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                  INCOME PROPOSAL
+                                </span>
+                              )}
+                              {isExpense && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                                  EXPENSE PROPOSAL
+                                </span>
+                              )}
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-700 dark:bg-violet-950/80 dark:text-violet-300">
+                                {msg.action.status.toUpperCase()}
                               </span>
-                              <button
-                                onClick={() => msg.action && rollbackAction(msg.action.id)}
-                                className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline cursor-pointer font-medium"
-                              >
-                                <RotateCcw className="w-3 h-3 text-zinc-400" />
-                                <span>Undo Action</span>
-                              </button>
+                            </div>
+                          </div>
+
+                          <div className="text-zinc-800 dark:text-zinc-200 text-xs font-sans flex items-start gap-2">
+                            {isIncome && <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+{txAmount ? `$${txAmount.toFixed(2)}` : ''}</span>}
+                            {isExpense && <span className="text-rose-600 dark:text-rose-400 font-bold font-mono">-{txAmount ? `$${txAmount.toFixed(2)}` : ''}</span>}
+                            <span>{msg.action.description}</span>
+                          </div>
+
+                          {msg.action.dryRunImpact?.liquidityWarning && (
+                            <div className="flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>{msg.action.dryRunImpact.liquidityWarning}</span>
                             </div>
                           )}
+
+                          {/* Action Execution Buttons */}
+                          <div className="pt-1 flex items-center gap-2">
+                            {msg.action.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => msg.action && applyAction(msg.action.id)}
+                                  className={`flex-1 py-2 font-semibold rounded-lg text-xs transition-colors tactile-btn cursor-pointer shadow-xs text-white ${
+                                    isIncome
+                                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                                      : 'bg-violet-600 hover:bg-violet-700'
+                                  }`}
+                                >
+                                  {isIncome
+                                    ? `Approve & Record Income (+$${txAmount?.toFixed(2) || ''})`
+                                    : isExpense
+                                    ? `Approve & Record Expense (-$${txAmount?.toFixed(2) || ''})`
+                                    : 'Approve & Record'}
+                                </button>
+                                <button
+                                  onClick={() => msg.action && rejectAction(msg.action.id)}
+                                  className="px-3.5 py-2 border border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg text-xs transition-colors cursor-pointer"
+                                >
+                                  Dismiss
+                                </button>
+                              </>
+                            )}
+
+                            {msg.action.status === 'applied' && (
+                              <div className="flex items-center justify-between w-full pt-1">
+                                <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>Committed to Browser Storage</span>
+                                </span>
+                                <button
+                                  onClick={() => msg.action && rollbackAction(msg.action.id)}
+                                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 underline cursor-pointer font-medium"
+                                >
+                                  <RotateCcw className="w-3 h-3 text-zinc-400" />
+                                  <span>Undo Action</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Persistent Memory Revision Notification */}
                     {msg.memoryUpdateNote && (

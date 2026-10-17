@@ -7,6 +7,7 @@ import {
   PieChart,
   Calendar,
   Brain,
+  Settings
 } from 'lucide-react';
 
 export const BottomDock: React.FC = () => {
@@ -19,7 +20,8 @@ export const BottomDock: React.FC = () => {
     { label: 'Wallet', view: 'overview', icon: <Wallet className="w-4 h-4" /> },
     { label: 'Envelopes', view: 'budgets', icon: <PieChart className="w-4 h-4" /> },
     { label: 'Bills', view: 'bills', icon: <Calendar className="w-4 h-4" /> },
-    { label: 'Memory', view: 'memory', icon: <Brain className="w-4 h-4" /> }
+    { label: 'Memory', view: 'memory', icon: <Brain className="w-4 h-4" /> },
+    { label: 'Settings', view: 'settings', icon: <Settings className="w-4 h-4" /> }
   ];
 
   return (

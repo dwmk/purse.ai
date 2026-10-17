@@ -1,10 +1,13 @@
 import React, { useEffect } from 'react';
+import { useFinance } from '../../context/FinanceContext';
 
 /**
  * Purse landing page.
  * The layout and styling are ported directly from the supplied HTML reference.
  */
 export const LandingPage: React.FC = () => {
+  const { setCurrentView } = useFinance();
+
   useEffect(() => {
     const f: [string, number, number, number, number, string][] = [
       ["Money in checking", 640, 0, 2000, 10, "bal"],
@@ -101,10 +104,18 @@ export const LandingPage: React.FC = () => {
     };
     renderActions();
 
-    return () => {
-      // The page is removed on unmount, so DOM-bound listeners are discarded with it.
+    const appLinks = document.querySelectorAll<HTMLAnchorElement>('a[href="/app"], a[href="#/app"]');
+    const handleAppLink = (e: MouseEvent) => {
+      e.preventDefault();
+      setCurrentView('chat');
+      window.history.pushState(null, '', '/app');
     };
-  }, []);
+    appLinks.forEach(link => link.addEventListener('click', handleAppLink));
+
+    return () => {
+      appLinks.forEach(link => link.removeEventListener('click', handleAppLink));
+    };
+  }, [setCurrentView]);
 
   return (
     <div className="purse-landing">
@@ -180,13 +191,11 @@ footer{border-top:1px solid var(--line);padding:2rem 0;color:var(--mute);font-si
         .purse-landing { min-height: 100vh; background: var(--bg); color: var(--ink); }
       `}</style>
       <div dangerouslySetInnerHTML={{ __html: `<div class="wrap">
-<nav><a class="logo" href="#top">Purse</a><a class="btn ghost" href="/app">Get started</a></nav>
-
 <header class="hero" id="top">
 <div>
 <h1>Know what’s safe to spend today.</h1>
 <p class="lead">Purse is the money copilot for students. Type your spending like a text, see what’s left after rent and bills, and catch subscriptions you forgot you pay for. Your data stays on your device.</p>
-<div class="cta"><a class="btn" href="/app">Open App</a><a class="btn ghost" href="#envelopes">See how it works</a></div>
+<div class="cta"><a class="btn" href="/app">Get Started</a><a class="btn ghost" href="#envelopes">See how it works</a></div>
 </div>
 <div class="calc" aria-label="Safe to spend calculator">
 <h3>Try it with your numbers</h3>

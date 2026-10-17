@@ -149,6 +149,72 @@ async function startServer() {
           ? 'gemini-3.8-flash'
           : model;
 
+        // Streaming support via Server-Sent Events (SSE)
+        if (req.body.stream) {
+          res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-cache, no-transform');
+          res.setHeader('Connection', 'keep-alive');
+          res.setHeader('X-Accel-Buffering', 'no');
+          if (typeof res.flushHeaders === 'function') {
+            res.flushHeaders();
+          }
+
+          try {
+            const stream = await client.models.generateContentStream({
+              model: selectedModel,
+              contents,
+              config: {
+                systemInstruction: systemInstruction || undefined,
+                temperature,
+              }
+            });
+
+            for await (const chunk of stream) {
+              const chunkText = chunk.text || '';
+              if (chunkText) {
+                res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+                if (typeof (res as any).flush === 'function') {
+                  (res as any).flush();
+                }
+              }
+            }
+            res.write(`data: [DONE]\n\n`);
+            if (typeof (res as any).flush === 'function') {
+              (res as any).flush();
+            }
+            res.end();
+            return;
+          } catch (streamErr: any) {
+            console.warn('Gemini generateContentStream error:', streamErr?.message || streamErr);
+            try {
+              const fallbackResponse = await client.models.generateContent({
+                model: selectedModel,
+                contents,
+                config: {
+                  systemInstruction: systemInstruction || undefined,
+                  temperature,
+                }
+              });
+              const replyText = fallbackResponse.text || '';
+              if (replyText) {
+                res.write(`data: ${JSON.stringify({ text: replyText })}\n\n`);
+                res.write(`data: [DONE]\n\n`);
+                if (typeof (res as any).flush === 'function') {
+                  (res as any).flush();
+                }
+                res.end();
+                return;
+              }
+            } catch (fallbackErr: any) {
+              console.warn('Gemini fallback attempt error:', fallbackErr?.message || fallbackErr);
+            }
+
+            res.write(`data: ${JSON.stringify({ error: streamErr?.message || 'Streaming failed' })}\n\n`);
+            res.end();
+            return;
+          }
+        }
+
         let reply = '';
         let lastErr: any = null;
 

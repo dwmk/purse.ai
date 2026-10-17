@@ -655,15 +655,46 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setIsGenerating(true);
 
+    const agentMsgId = `msg_agent_${Date.now()}`;
+    const initialAgentMsg: ChatMessage = {
+      id: agentMsgId,
+      sender: 'agent',
+      content: '',
+      timestamp: new Date().toISOString()
+    };
+
+    // Add streaming message container immediately to conversation
+    const streamingChatList = [...newChatList, initialAgentMsg];
+    const updatedConvStreaming: ConversationSession = {
+      ...updatedConvStage1,
+      updatedAt: new Date().toISOString(),
+      messages: streamingChatList
+    };
+
+    setConversations(prev => prev.map(c => c.id === targetConv.id ? updatedConvStreaming : c));
+
     try {
-      const response = await processAgentMessage(userInput, {
-        accounts,
-        transactions,
-        bills,
-        budgets,
-        memory,
-        config
-      });
+      const response = await processAgentMessage(
+        userInput,
+        {
+          accounts,
+          transactions,
+          bills,
+          budgets,
+          memory,
+          config
+        },
+        (partialText) => {
+          // Real-time streaming word-by-word update callback
+          setConversations(prev => prev.map(c => {
+            if (c.id !== targetConv.id) return c;
+            return {
+              ...c,
+              messages: c.messages.map(m => m.id === agentMsgId ? { ...m, content: partialText } : m)
+            };
+          }));
+        }
+      );
 
       if (response.action) {
         const nextActions = [response.action, ...actions];
@@ -682,8 +713,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         StorageService.saveMemory(response.updatedMemory);
       }
 
-      const agentMsgId = `msg_agent_${Date.now()}`;
-      const agentMsg: ChatMessage = {
+      const completedAgentMsg: ChatMessage = {
         id: agentMsgId,
         sender: 'agent',
         content: response.content,
@@ -693,7 +723,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         memoryUpdateNote: response.memoryNote
       };
 
-      const finalChat = [...newChatList, agentMsg];
+      const finalChat = [...newChatList, completedAgentMsg];
       const updatedConvStage2: ConversationSession = {
         ...updatedConvStage1,
         updatedAt: new Date().toISOString(),

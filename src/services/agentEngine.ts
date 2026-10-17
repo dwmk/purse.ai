@@ -71,9 +71,41 @@ export function extractAmount(text: string): number | null {
   if (match) return parseFloat(match[1]);
   const numMatch = text.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\s*(?:dollars|bucks|usd)\b/i);
   if (numMatch) return parseFloat(numMatch[1]);
-  const standaloneMatch = text.match(/(?:spent|paid|cost|add|bought|received|receive|earn|earned|income|log|gain|gained|gaining|made|deposited|deposit|sold)\s+([0-9]+(?:\.[0-9]{1,2})?)/i);
+  const standaloneMatch = text.match(/(?:spent|paid|cost|add|bought|received|receive|earn|earned|earning|income|log|gain|gained|gaining|gains|made|deposited|deposit|sold|got|plus|\+)\s+\$?([0-9]+(?:\.[0-9]{1,2})?)/i);
   if (standaloneMatch) return parseFloat(standaloneMatch[1]);
+  const plusMatch = text.match(/\+\s*\$?([0-9]+(?:\.[0-9]{1,2})?)/);
+  if (plusMatch) return parseFloat(plusMatch[1]);
+  const postDollarMatch = text.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\s*\$/);
+  if (postDollarMatch) return parseFloat(postDollarMatch[1]);
   return null;
+}
+
+// Comprehensive Income Intent Classifier
+export function isIncomeIntent(text: string): boolean {
+  const lower = text.toLowerCase();
+  
+  const incomePatterns = [
+    /\b(gain|gained|gaining|gains)\b/i,
+    /\b(earn|earned|earning|earns)\b/i,
+    /\b(income|salary|paycheck|payroll|wage|wages|stipend)\b/i,
+    /\b(deposit|deposited|depositing|deposits)\b/i,
+    /\b(receive|received|receives|receiving)\b/i,
+    /\b(got|get|gets)\s+(?:\$|[0-9]|\bpaid\b|\bmoney\b|\bcash\b)/i,
+    /\b(made|make|makes)\s+(?:\$|[0-9]|\bprofit\b|\bmoney\b|\bcash\b)/i,
+    /\b(sold|sell|selling|sells)\b/i,
+    /\b(refund|refunded|refunds|refunding)\b/i,
+    /\b(reimburse|reimbursed|reimbursement|reimbursements)\b/i,
+    /\b(dividend|dividends|yield|interest)\b/i,
+    /\b(cashback|cash\s*back|bonus|bonuses|reward|rewards|grant|grants)\b/i,
+    /\b(win|won|winning|winnings)\b/i,
+    /\b(credit|credited|credits)\b/i,
+    /\b(add|added)\s+(?:\$|[0-9]+).*?\b(?:to|into)\b/i,
+    /\b(paid\s+me|gave\s+me|sent\s+me|transferred\s+me)\b/i,
+    /\b(incoming|inflow)\b/i,
+    /^\s*\+\s*\$?[0-9]+/
+  ];
+
+  return incomePatterns.some(p => p.test(lower));
 }
 
 // Cognitive Edge Rule Engine for Action Extraction & Intent Parsing
@@ -88,7 +120,7 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     .filter(a => a.type === 'checking' || a.type === 'savings')
     .reduce((sum, a) => sum + a.balance, 0);
 
-  // 2. INTENT: CASH RUNWAY QUERY
+  // 1. INTENT: CASH RUNWAY QUERY
   if (lower.includes('runway') || lower.includes('how long can i survive') || lower.includes('survival')) {
     const monthlyNeeds = budgets
       .filter(b => b.type === 'need')
@@ -180,28 +212,41 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 
   // 4. INTENT: LOG TRANSACTION (Conversational Bookkeeping)
   const amt = extractAmount(text);
-  const incomeRegex = /\b(gain|gained|gaining|gains|income|received|receive|receives|got|get|gets|earn|earned|earning|earns|salary|paycheck|deposit|deposited|depositing|deposits|sold|sell|selling|dividend|dividends|refund|refunded|refunds|reimbursement|reimbursed|cashback|bonus|profit|profits|made|win|won|credit|credited|credits)\b|paid\s+me|gave\s+me|sent\s+me|incoming\b/i;
-  const isIncome = incomeRegex.test(lower);
+  const isIncome = isIncomeIntent(text);
   const isTransaction = amt !== null || lower.includes('spent') || lower.includes('paid') || lower.includes('bought') || lower.includes('cost') || isIncome;
 
   if (isTransaction && amt !== null) {
-    const category = isIncome ? 'Savings & Investments' : detectCategory(text);
-    // Merchant / Source extraction
-    let merchant = isIncome ? 'Direct Deposit / Payer' : 'Unknown Merchant';
+    let category: ExpenseCategory;
+    let merchant: string;
+
     if (isIncome) {
-      const fromMatch = text.match(/(?:from|by|via|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|on|\$|[0-9]|\.|$))/i);
+      if (lower.match(/salary|paycheck|payroll|wage|job|work/)) {
+        category = 'Other';
+        merchant = 'Employer Payroll';
+      } else if (lower.match(/freelance|client|invoice|consult/)) {
+        category = 'Other';
+        merchant = 'Client Payment';
+      } else if (lower.match(/dividend|invest|stock|yield|interest/)) {
+        category = 'Savings & Investments';
+        merchant = 'Investment Yield';
+      } else if (lower.match(/refund|cashback|reimbursement/)) {
+        category = detectCategory(text);
+        merchant = 'Merchant Refund';
+      } else if (lower.match(/sold|sale/)) {
+        category = 'Other';
+        merchant = 'Personal Sale';
+      } else {
+        category = 'Savings & Investments';
+        merchant = 'Income Deposit';
+      }
+
+      const fromMatch = text.match(/(?:from|by|via)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|on|\$|[0-9]|\.|$))/i);
       if (fromMatch && fromMatch[1].trim().length > 1) {
         merchant = fromMatch[1].trim();
-      } else if (lower.includes('salary') || lower.includes('paycheck')) {
-        merchant = 'Employer Payroll';
-      } else if (lower.includes('freelance') || lower.includes('client')) {
-        merchant = 'Client Invoice';
-      } else if (lower.includes('dividend')) {
-        merchant = 'Investment Dividend';
-      } else if (lower.includes('refund')) {
-        merchant = 'Merchant Refund';
       }
     } else {
+      category = detectCategory(text);
+      merchant = 'Retail Merchant';
       const atMatch = text.match(/(?:at|to|for)\s+([A-Za-z0-9'\s&.-]+?)(?:\s+(?:today|yesterday|for|on|\$|[0-9]|\.|$))/i);
       if (atMatch && atMatch[1].trim().length > 1) {
         merchant = atMatch[1].trim();
@@ -245,7 +290,6 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
       }
     };
 
-    // Check if new rule/habit should be registered in memory
     let memoryNote: string | undefined;
     let updatedMemory: MemoryFile | undefined;
     if (merchant.toLowerCase().includes('trader joe') || amt > 100) {
@@ -253,15 +297,19 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     }
 
     return {
-      content: `I parsed your intent to record **$${amt.toFixed(2)}** for **${merchant}** categorized under **${category}**.\n\n- **Impact:** ${isIncome ? '+' : '-'}$${amt.toFixed(2)} to ${checkingAcc?.name}\n- **Projected Balance:** $${newBal.toFixed(2)}\n${liquidityWarning ? `⚠️ **${liquidityWarning}**\n` : ''}\nI have prepared a safe execution plan below for your confirmation.`,
+      content: isIncome
+        ? `I parsed your intent to record **+$${amt.toFixed(2)}** income from **${merchant}** (${category}).\n\n- **Type:** Income (+)\n- **Account:** ${checkingAcc?.name || 'Primary Checking'}\n- **Projected Balance:** $${newBal.toFixed(2)} (+$${amt.toFixed(2)})\n\nI have prepared a safe execution plan below for your approval.`
+        : `I parsed your intent to record **$${amt.toFixed(2)}** expense for **${merchant}** (${category}).\n\n- **Type:** Expense (-)\n- **Impact:** -$${amt.toFixed(2)} to ${checkingAcc?.name || 'Primary Checking'}\n- **Projected Balance:** $${newBal.toFixed(2)}\n${liquidityWarning ? `⚠️ **${liquidityWarning}**\n` : ''}\nI have prepared a safe execution plan below for your confirmation.`,
       measurableValue: `${isIncome ? '+$' : '-$'}${amt.toFixed(2)} logged to ${category}`,
       plan: {
         id: `plan_tx_${Date.now()}`,
-        intent: 'CONVERSATIONAL_BOOKKEEPING_LOG',
+        intent: isIncome ? 'CONVERSATIONAL_INCOME_LOG' : 'CONVERSATIONAL_EXPENSE_LOG',
         confidence: 0.96,
-        reasoning: 'Extracted merchant, amount, category and checked against liquidity invariants.',
+        reasoning: isIncome
+          ? 'Parsed income transaction, updated projected balance upward, and verified liquidity.'
+          : 'Extracted merchant, amount, category and checked against liquidity invariants.',
         steps: [
-          { step: 1, title: 'Parse Natural Language Entities', detail: `Amount: $${amt.toFixed(2)} · Category: ${category} · Merchant: ${merchant}`, status: 'completed' },
+          { step: 1, title: 'Parse Natural Language Entities', detail: `Type: ${isIncome ? 'Income (+)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
           { step: 2, title: 'Verify Account & Balance Cushion', detail: `Projected checking balance: $${newBal.toFixed(2)}`, status: 'completed' },
           { step: 3, title: 'Prepare Non-Destructive Mutation', detail: 'Awaiting user execution confirmation', status: 'in_progress' }
         ],
@@ -403,19 +451,38 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
   };
 }
 
-// Full-stack Agent Reasoning Dispatcher
+// Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
 export async function processAgentMessage(
   userInput: string,
-  context: AgentContext
+  context: AgentContext,
+  onChunk?: (partialText: string) => void
 ): Promise<AgentResponse> {
-  const { config, memory, transactions, bills, budgets, accounts } = context;
+  const { config, memory, bills, budgets, accounts } = context;
 
   // Sync latest ledger snapshot to the browser Vector Database
   try {
-    vectorDb.syncLedgerContext({ accounts, transactions, bills, budgets, memory });
+    vectorDb.syncLedgerContext({ accounts, transactions: context.transactions, bills, budgets, memory });
   } catch (syncErr) {
     console.warn('[VectorDB] Sync notice:', syncErr);
   }
+
+  // Check if user input triggered a concrete ledger action (e.g. logging a transaction)
+  const edgePlan = runEdgeCognition(userInput, context);
+  const hasConcreteAction = Boolean(edgePlan.action);
+
+  // Helper to stream text word-by-word if needed
+  const streamFallbackText = async (text: string) => {
+    if (!onChunk || !text) return;
+    const words = text.split(' ');
+    let current = '';
+    for (let i = 0; i < words.length; i++) {
+      current += (i === 0 ? '' : ' ') + words[i];
+      onChunk(current);
+      if (i < words.length - 1) {
+        await new Promise(r => setTimeout(r, 18));
+      }
+    }
+  };
 
   // Always invoke LLM via server-side reasoning endpoint (Gemini, OpenAI, DeepSeek, Z.ai)
   try {
@@ -472,20 +539,25 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
         apiKey: config.apiKey,
         model: effectiveModel,
         messages: [{ role: 'user', content: userInput }],
-        systemInstruction: systemPrompt
+        systemInstruction: systemPrompt,
+        stream: true
       })
     });
 
-    // Check if user input triggered a concrete ledger action (e.g. logging a transaction)
-    const edgePlan = runEdgeCognition(userInput, context);
-    const hasConcreteAction = Boolean(edgePlan.action);
-
     if (!res.ok) {
       const errData = await res.json().catch(() => ({}));
-      const errDetail = errData.error || `${res.status} ${res.statusText}`;
-      // All messages must be from LLM, return actual error with no fake mock replies
+      const statusText = res.statusText || (res.status === 404 ? 'Not Found' : 'Error');
+      const errDetail = errData.error || `${res.status} ${statusText}`;
+
+      // If edge cognition determined an answer or transaction action, provide it with status notice
+      const fallbackContent = edgePlan.content
+        ? `${edgePlan.content}\n\n*(Note: Cloud backend returned ${errDetail}; processed locally via edge engine.)*`
+        : `LLM Service Notice: ${errDetail}. Please check your connection or LLM settings in the top bar.`;
+
+      await streamFallbackText(fallbackContent);
+
       return {
-        content: `LLM Service Notice: ${errDetail}. Please check your connection or LLM settings.`,
+        content: fallbackContent,
         plan: hasConcreteAction ? edgePlan.plan : undefined,
         action: edgePlan.action,
         measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
@@ -494,8 +566,66 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
       };
     }
 
-    const data = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+
+    // Handle real-time Server-Sent Events (SSE) stream
+    if (contentType.includes('text/event-stream') && res.body) {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let streamBuffer = '';
+      let accumulated = '';
+      let streamError = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        streamBuffer += decoder.decode(value, { stream: true });
+        const lines = streamBuffer.split('\n');
+        streamBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || !trimmed.startsWith('data:')) continue;
+          const payloadStr = trimmed.replace(/^data:\s*/, '');
+          if (payloadStr === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(payloadStr);
+            if (parsed.error) {
+              streamError = typeof parsed.error === 'string' ? parsed.error : JSON.stringify(parsed.error);
+            }
+            if (parsed.text) {
+              accumulated += parsed.text;
+              if (onChunk) onChunk(accumulated);
+            }
+          } catch {}
+        }
+      }
+
+      if (accumulated.trim()) {
+        return {
+          content: accumulated,
+          plan: hasConcreteAction ? edgePlan.plan : undefined,
+          action: edgePlan.action,
+          measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
+          memoryNote: edgePlan.memoryNote,
+          updatedMemory: edgePlan.updatedMemory
+        };
+      }
+
+      if (streamError) {
+        throw new Error(streamError);
+      }
+    }
+
+    // Standard JSON response fallback
+    const data = await res.json().catch(() => ({}));
     const reply = data.reply || '';
+
+    if (onChunk && reply) {
+      await streamFallbackText(reply);
+    }
 
     return {
       content: reply,
@@ -507,11 +637,14 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
     };
   } catch (err: any) {
     console.error('LLM generation error:', err);
-    // All messages sent by the AI agent must be generated via the LLM with no fallbacks!
-    const edgePlan = runEdgeCognition(userInput, context);
-    const hasConcreteAction = Boolean(edgePlan.action);
+    const fallbackContent = edgePlan.content
+      ? `${edgePlan.content}\n\n*(Note: Local resilience fallback active: ${err?.message || 'Server connection unreachable'})*`
+      : `LLM Connection Error: ${err?.message || 'Failed to reach AI Agent server'}. Please check your connection or LLM settings.`;
+
+    await streamFallbackText(fallbackContent);
+
     return {
-      content: `LLM Connection Error: ${err?.message || 'Failed to reach AI Agent server'}. All messages must come directly from the LLM.`,
+      content: fallbackContent,
       plan: hasConcreteAction ? edgePlan.plan : undefined,
       action: edgePlan.action,
       measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,

@@ -209,6 +209,7 @@ export const SpeechService = {
       const words = cleanText.split(/\s+/).filter(Boolean);
       let wordIndex = 0;
       let streamInterval: any = null;
+      let hasNativeBoundary = false;
 
       const clearStreamer = () => {
         if (streamInterval) {
@@ -217,17 +218,22 @@ export const SpeechService = {
         }
       };
 
-      // Helper to extract a sliding window of recent 5-6 words
-      const getRecentWordsWindow = (targetIndex: number): string => {
-        const start = Math.max(0, targetIndex - 5);
-        const end = Math.min(words.length, targetIndex + 1);
+      // Chunk words into stable, balanced phrases of 6-8 words to eliminate elastic banding
+      const PHRASE_SIZE = 7;
+      const getStablePhrase = (currentIdx: number): string => {
+        const phraseNum = Math.floor(currentIdx / PHRASE_SIZE);
+        const start = phraseNum * PHRASE_SIZE;
+        const end = Math.min(words.length, start + PHRASE_SIZE);
+        // Returns the stable phrase and indicates the active word index within it
         return words.slice(start, end).join(' ');
       };
 
-      // Real-time boundary event: display ONLY recent 5-6 words so subtitle area stays clear & uncluttered
+      // Real-time boundary event: highlights words within stable phrases without jitter
       utterance.onboundary = (event) => {
         if (event.name === 'word') {
-          // Find which word index corresponds to the charIndex
+          hasNativeBoundary = true;
+          clearStreamer(); // Native timing active, kill synthetic timer immediately
+
           const prefix = cleanText.substring(0, event.charIndex + (event.charLength || 4));
           const currentCount = prefix.trim().split(/\s+/).filter(Boolean).length;
           wordIndex = Math.max(0, currentCount - 1);
@@ -235,40 +241,51 @@ export const SpeechService = {
           lipSyncManager.setWord(currentWord);
 
           if (showSubtitles) {
-            const recentWords = getRecentWordsWindow(wordIndex);
-            notifySubtitles(recentWords, true);
+            const stablePhrase = getStablePhrase(wordIndex);
+            notifySubtitles(stablePhrase, true);
           }
-          if (onWord) onWord(getRecentWordsWindow(wordIndex));
+          if (onWord) onWord(words[wordIndex] || '');
         }
       };
 
       lipSyncManager.setSpeaking(true, words[0] || '');
 
-      // Progressive streaming ticker fallback if browser boundary events are infrequent
+      // Fallback timer ticker: only runs if browser does NOT emit native word boundaries
       if (showSubtitles && words.length > 0) {
-        // Start with first 2 words
-        notifySubtitles(words.slice(0, Math.min(3, words.length)).join(' '), true);
-        const approxWordIntervalMs = 270; // Natural pacing per word spoken
-        streamInterval = setInterval(() => {
-          if (wordIndex < words.length - 1) {
-            wordIndex += 1;
-            lipSyncManager.setWord(words[wordIndex] || '');
-            const recentWords = getRecentWordsWindow(wordIndex);
-            notifySubtitles(recentWords, true);
-          } else {
-            clearStreamer();
+        notifySubtitles(getStablePhrase(0), true);
+        const approxWordIntervalMs = 280;
+        
+        // Start fallback only after a delay if native boundary hasn't fired
+        const fallbackTimer = setTimeout(() => {
+          if (!hasNativeBoundary && words.length > 1) {
+            streamInterval = setInterval(() => {
+              if (wordIndex < words.length - 1) {
+                wordIndex += 1;
+                lipSyncManager.setWord(words[wordIndex] || '');
+                const stablePhrase = getStablePhrase(wordIndex);
+                notifySubtitles(stablePhrase, true);
+              } else {
+                clearStreamer();
+              }
+            }, approxWordIntervalMs);
           }
-        }, approxWordIntervalMs);
+        }, 350);
+
+        // Store reference to clear if speech ends
+        (utterance as any)._fallbackTimeout = fallbackTimer;
       }
 
       let fadeTimeout: any = null;
       const finishHandler = () => {
+        if ((utterance as any)._fallbackTimeout) {
+          clearTimeout((utterance as any)._fallbackTimeout);
+        }
         clearStreamer();
         lipSyncManager.setSpeaking(false);
-        // Give the last 5-6 words a moment to be read, then span away automatically
+        // Smoothly fade subtitle without snapping
         fadeTimeout = setTimeout(() => {
           notifySubtitles('', false);
-        }, 850);
+        }, 600);
         if (onEnd) onEnd();
       };
 
