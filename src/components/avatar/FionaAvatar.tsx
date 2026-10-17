@@ -67,11 +67,11 @@ export const FionaAvatar: React.FC = () => {
       // Zoomed-out waist-length portrait framing in Chat view (framed comfortably lower)
       const isMobile = width < 640;
       cameraRef.current.position.set(0, 0.68, isMobile ? 2.35 : 2.12);
-      cameraRef.current.lookAt(0, 0.52, 0);
+      cameraRef.current.lookAt(0, 0.68, 0);
     } else {
       // PIP mode in bottom-left corner
       cameraRef.current.position.set(0, 0.68, 2.22);
-      cameraRef.current.lookAt(0, 0.52, 0);
+      cameraRef.current.lookAt(0, 0.68, 0);
     }
 
     cameraRef.current.updateProjectionMatrix();
@@ -89,7 +89,7 @@ export const FionaAvatar: React.FC = () => {
     // Perspective Camera setup: zoomed out waist-height framing lowered
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20.0);
     camera.position.set(0, 0.68, 2.12);
-    camera.lookAt(0, 0.52, 0);
+    camera.lookAt(0, 0.68, 0);
     cameraRef.current = camera;
 
     // WebGL Renderer with full alpha transparency
@@ -408,8 +408,8 @@ export const FionaAvatar: React.FC = () => {
           isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         } ${
           isChatView
-            ? 'fixed inset-0 top-16 pb-20 z-20 flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
-            : 'fixed bottom-16 sm:bottom-6 left-4 sm:left-6 w-44 h-64 sm:w-56 sm:h-80 z-30 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 transition-transform'
+        ? 'fixed inset-0 top-16 pb-20 z-20 max-w-[640px] mx-auto flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
+        : 'fixed bottom-16 sm:bottom-6 left-4 sm:left-6 w-44 h-64 sm:w-56 sm:h-80 z-30 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 transition-transform'
         }`}
         title={
           isChatView

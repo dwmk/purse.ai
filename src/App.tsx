@@ -1,6 +1,5 @@
 import React from 'react';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
-import { TopBar } from './components/layout/TopBar';
 import { BottomDock } from './components/layout/BottomDock';
 import { ConversationSidebar } from './components/layout/ConversationSidebar';
 import { FionaAvatar } from './components/avatar/FionaAvatar';
@@ -50,7 +49,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FB] dark:bg-[#0A0910] text-[#18181B] dark:text-[#F4F4F5] flex flex-col font-sans transition-colors duration-200">
-      <TopBar />
       
       {/* Slide-out / Collapsible Conversation History Sidebar */}
       <ConversationSidebar />

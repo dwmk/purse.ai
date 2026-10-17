@@ -221,7 +221,7 @@ export const OverviewView: React.FC = () => {
         className="w-full py-4 rounded-2xl bg-violet-600 text-white hover:bg-violet-700 font-semibold text-sm flex items-center justify-center gap-2 shadow-lg transition-all tactile-btn cursor-pointer"
       >
         <Sparkles className="w-4 h-4" />
-        <span>Ask Purse Copilot to Log or Analyze</span>
+        <span>Ask Fiona to Log or Analyze</span>
       </button>
 
     </div>
