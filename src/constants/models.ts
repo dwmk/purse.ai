@@ -19,21 +19,21 @@ export interface ModelProviderOption {
 
 export const MODEL_OPTIONS: ModelProviderOption[] = [
   {
+    id: 'gemini',
+    name: 'Google Gemini',
+    tag: 'gemini-3.8-flash',
+    model: 'gemini-3.8-flash',
+    isApiBased: true,
+    logo: MODEL_LOGOS.gemini,
+    description: 'High-speed analytical reasoning with structured financial insight.'
+  },
+  {
     id: 'edge',
     name: 'Browser Edge (Local)',
     tag: 'smolLM2 / 100% Offline',
     model: 'smolLM2-360M-instruct',
     isApiBased: false,
     description: 'Runs entirely in your browser using local WebAssembly & CacheStorage. Zero external API calls.'
-  },
-  {
-    id: 'gemini',
-    name: 'Google Gemini',
-    tag: 'gemini-flash-latest',
-    model: 'gemini-flash-latest',
-    isApiBased: true,
-    logo: MODEL_LOGOS.gemini,
-    description: 'High-speed analytical reasoning with structured financial insight.'
   },
   {
     id: 'openai',

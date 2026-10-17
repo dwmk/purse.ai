@@ -9,6 +9,7 @@ import {
   MemoryFile,
   Transaction
 } from '../types/finance';
+import { vectorDb } from './vectorDb';
 
 export interface AgentContext {
   accounts: Account[];
@@ -87,7 +88,21 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     .filter(a => a.type === 'checking' || a.type === 'savings')
     .reduce((sum, a) => sum + a.balance, 0);
 
-  // 1. INTENT: CASH RUNWAY QUERY
+  // 1. CASUAL GREETING & GENERAL TALK (Friendly Personal Secretary response)
+  if (
+    lower.match(/^(hi|hello|hey|howdy|yo|greetings|good morning|good afternoon|good evening)\b/) ||
+    lower === 'hi' ||
+    lower === 'hello' ||
+    lower === 'hey' ||
+    lower.includes('how are you') ||
+    lower.includes('who are you')
+  ) {
+    return {
+      content: `Hey there! Good to see you. I'm keeping tabs on your accounts and bills right here in your browser. How can I help you today? Need to log an expense, check if you have room for a treat, or plan your savings goals?`
+    };
+  }
+
+  // 2. INTENT: CASH RUNWAY QUERY
   if (lower.includes('runway') || lower.includes('how long can i survive') || lower.includes('survival')) {
     const monthlyNeeds = budgets
       .filter(b => b.type === 'need')
@@ -364,29 +379,25 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     }
   }
 
-  // 7. DEFAULT: COMPREHENSIVE FINANCIAL ADVICE & SUMMARY
-  const monthlyIncome = memory.profile.monthlyIncome;
-  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
-  const currentMonthExpenses = transactions
-    .filter(t => t.type === 'expense' && (t.date.startsWith(currentMonthPrefix) || transactions.length < 20))
-    .reduce((sum, t) => sum + t.amount, 0);
-  const netCashFlow = monthlyIncome - currentMonthExpenses;
-  const safeDailySpend = Math.max(0, (netCashFlow / 16)).toFixed(2);
+  // 7. ONLY PROVIDE FULL REPORT IF USER EXPLICITLY ASKS FOR A SUMMARY OR REPORT
+  if (lower.includes('report') || lower.includes('summary') || lower.includes('breakdown') || lower.includes('overview') || lower.includes('audit my finances')) {
+    const monthlyIncome = memory.profile.monthlyIncome;
+    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+    const currentMonthExpenses = transactions
+      .filter(t => t.type === 'expense' && (t.date.startsWith(currentMonthPrefix) || transactions.length < 20))
+      .reduce((sum, t) => sum + t.amount, 0);
+    const netCashFlow = monthlyIncome - currentMonthExpenses;
+    const safeDailySpend = Math.max(0, (netCashFlow / 16)).toFixed(2);
 
+    return {
+      content: `### Financial Overview & Status Summary\n\n- **Monthly Net Cash Flow:** **+$${netCashFlow.toFixed(2)}** (Income: $${monthlyIncome.toFixed(2)} · Outflows: $${currentMonthExpenses.toFixed(2)})\n- **Safe-to-Spend Today:** **$${safeDailySpend}/day** discretionary allowance\n- **Checking Balance:** $${checkingBalance.toFixed(2)} (Safe Floor: $${memory.profile.minimumCheckingFloor.toFixed(2)})\n- **Next Payday:** ${memory.profile.nextPayday}\n\nLet me know if you want to look closer into any specific category or bill!`,
+      measurableValue: `$${safeDailySpend}/day Safe Spend`
+    };
+  }
+
+  // 8. DEFAULT: Friendly, natural secretary conversation
   return {
-    content: `### October Financial Position & Action Summary\n\n- **Monthly Net Cash Flow:** **+$${netCashFlow.toFixed(2)}** (Income: $${monthlyIncome.toFixed(2)} · Expenses: $${currentMonthExpenses.toFixed(2)})\n- **Safe-to-Spend Today:** **$${safeDailySpend}/day** remaining across discretionary categories\n- **Checking Balance:** $${checkingBalance.toFixed(2)} (Safe Floor: $${memory.profile.minimumCheckingFloor.toFixed(2)})\n- **Next Payday:** ${memory.profile.nextPayday} (Semi-monthly deposit of $2,850.00)\n\n**You can ask me to:**\n1. *"Log $45.20 spent at Trader Joe's"* (conversational bookkeeping)\n2. *"Can I afford a $180 dinner out tonight?"* (affordability check)\n3. *"What is my cash runway if my income stops?"* (liquidity stress test)\n4. *"Audit my recurring subscriptions"* (find leaks and redundant bills)\n5. *"Remember that I want to save an extra $200 for holiday travel"* (memory graph update)`,
-    measurableValue: `$${safeDailySpend}/day Safe Spend Headroom`,
-    plan: {
-      id: `plan_status_${Date.now()}`,
-      intent: 'FINANCIAL_OVERVIEW_AND_INQUIRY',
-      confidence: 0.99,
-      reasoning: 'Aggregated full ledger, recurring calendar, and active memory invariants.',
-      steps: [
-        { step: 1, title: 'Inspect Real Ledger & Budgets', detail: `$${currentMonthExpenses.toFixed(2)} spent out of $${monthlyIncome.toFixed(2)}`, status: 'completed' },
-        { step: 2, title: 'Check Next Payday Liquidity', detail: `${memory.profile.nextPayday} ($2,850 inflow)`, status: 'completed' },
-        { step: 3, title: 'Ready for Conversational Instructions', detail: 'Edge cognitive pipeline ready', status: 'completed' }
-      ]
-    }
+    content: `I'm keeping an eye on your finances right here in your browser. All your balances and upcoming bills look steady today. How can I help you right now? Feel free to ask about any purchase, log an expense, or check your savings!`
   };
 }
 
@@ -397,71 +408,114 @@ export async function processAgentMessage(
 ): Promise<AgentResponse> {
   const { config, memory, transactions, bills, budgets, accounts } = context;
 
-  // If user selected Edge engine or if offline, use Edge Cognition
-  if (config.provider === 'edge' || config.useEdgeFallback) {
+  // Sync latest ledger snapshot to the browser Vector Database
+  try {
+    vectorDb.syncLedgerContext({ accounts, transactions, bills, budgets, memory });
+  } catch (syncErr) {
+    console.warn('[VectorDB] Sync notice:', syncErr);
+  }
+
+  // Only use edge rule engine if user explicitly chose local edge engine
+  if (config.provider === 'edge') {
     try {
-      // First attempt edge rule engine
-      const edgeResult = runEdgeCognition(userInput, context);
-      return edgeResult;
+      return runEdgeCognition(userInput, context);
     } catch (e) {
-      console.warn('Edge cognition fallback error, retrying:', e);
+      console.warn('Edge cognition fallback error:', e);
       return runEdgeCognition(userInput, context);
     }
   }
 
-  // If user configured an LLM provider (Gemini, OpenAI, DeepSeek, Z.ai), call the full-stack server
+  // Use AI Agent (Gemini, OpenAI, DeepSeek, Z.ai) via full-stack server
   try {
-    const systemPrompt = `You are Purse Autonomous Personal Finance Agent, operating on decentralized edge computing.
-You understand financial intent, plan multi-step tasks, ensure safe execution, and respect user invariants.
+    // 1. Retrieve top semantically relevant chunks from local browser vector database
+    const ragContext = vectorDb.buildRagContext(userInput, 4);
 
-CURRENT AGENT PERSISTENT MEMORY FILE:
+    const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
+    const savingsAcc = accounts.find(a => a.type === 'savings');
+
+    // 2. Personal, human secretary system prompt
+    const systemPrompt = `You are Fiona, the user's friendly, sharp, and attentive personal finance secretary and accountant.
+
+ARCHITECTURE & MEMORY RETRIEVAL (Browser-Native Vector RAG):
+- You operate a decentralized in-browser vector database and embedding retrieval system (stored persistently in the user's browser).
+- The user's ledger, transaction history, active budget envelopes, recurring obligations, and lifestyle memory rules have been embedded and indexed into this local vector store.
+- Here are the most semantically relevant chunks retrieved from the user's local vector database for this prompt:
+
+${ragContext || '[No specific historical vector chunks matched]'}
+
+ACTIVE AGENT KNOWLEDGE GRAPH (Memory Core):
 ${memory.rawMarkdown}
 
-CURRENT FINANCIAL OVERVIEW:
-- Accounts: ${JSON.stringify(accounts.map(a => ({ name: a.name, type: a.type, balance: a.balance })))}
-- Recent Transactions: ${JSON.stringify(transactions.slice(0, 8).map(t => ({ date: t.date, amount: t.amount, category: t.category, merchant: t.merchant })))}
-- Upcoming Bills: ${JSON.stringify(bills.slice(0, 5).map(b => ({ name: b.name, amount: b.amount, due: b.dueDate })))}
-- Budgets: ${JSON.stringify(budgets.map(b => ({ category: b.category, allocated: b.allocated })))}
+QUICK LEDGER SNAPSHOT:
+- Checking Balance: $${(checkingAcc?.balance || 0).toFixed(2)}
+- Total Savings Vault: $${(savingsAcc?.balance || 0).toFixed(2)}
+- Envelopes: ${budgets.map(b => `${b.category} ($${b.allocated}/mo)`).join(', ')}
+- Upcoming Bills: ${bills.slice(0, 4).map(b => `${b.name} ($${b.amount} on ${b.dueDate})`).join(', ')}
 
-Instructions:
-1. Provide thoughtful, concise, accurate financial answers with measurable value.
-2. If the user mentions spending money or earning money, clearly identify the amount, category, and merchant.
-3. If the user states a new rule or preference, note how you will update the persistent memory file.
-4. Always prioritize user safety and avoiding late fees or overspending.`;
+CORE PERSONALITY & COMMUNICATION GUIDELINES:
+1. ACT LIKE A GENUINE PERSONAL SECRETARY / ACCOUNTANT:
+   - Be warm, friendly, conversational, and helpful. You are a trusted human-like confidante, NOT a cold corporate dashboard or robot.
+   - Talk in natural, simple English. Avoid stiff financial jargon unless asked.
+   - Feel free to engage in general friendly conversation, greetings ("Hey!", "Good morning!"), and everyday check-ins.
+
+2. NEVER DUMP UNSOLICITED BUSINESS REPORTS OR BULLETED SUMMARIES:
+   - For simple greetings, small talk, casual questions ("hey", "how are you?", "can I grab a coffee?"), reply in 1 to 3 friendly, direct, natural sentences.
+   - Do NOT produce full financial summaries, multi-bullet status reports, or executive overviews UNLESS the user explicitly asks for them (e.g. "give me a full breakdown", "run an audit", "summarize my finances", "prepare a report").
+   - When asked a specific question like "Can I afford dinner tonight?", answer conversationally with direct numbers (e.g. "Yes, totally! You've got $120 left in your dining envelope this week, so a $40 dinner is well within your safe zone.") instead of generating a 5-part corporate dossier.
+
+3. SMART BOOKKEEPING & RULES:
+   - If the user mentions spending or receiving money (e.g. "Spent $15 at Starbucks"), acknowledge it warmly and confirm it's tracked against their envelope.
+   - If the user shares a rule or personal goal ("Remember that I want to save $300 for a trip"), warmly confirm that you've noted it in their persistent memory.`;
+
+    const effectiveModel = (!config.model || config.model === 'gemini-flash-latest' || config.model === 'gemini-2.5-flash')
+      ? 'gemini-3.8-flash'
+      : config.model;
 
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        provider: config.provider,
+        provider: config.provider || 'gemini',
         apiKey: config.apiKey,
-        model: config.model,
+        model: effectiveModel,
         messages: [{ role: 'user', content: userInput }],
         systemInstruction: systemPrompt
       })
     });
 
     if (!res.ok) {
-      console.warn(`Server LLM error (${res.status}), falling back to Edge Cognition engine.`);
-      return runEdgeCognition(userInput, context);
+      const errData = await res.json().catch(() => ({}));
+      console.warn(`Server LLM error (${res.status}):`, errData);
+      if (config.useEdgeFallback) {
+        return runEdgeCognition(userInput, context);
+      }
+      return {
+        content: `I ran into a temporary issue connecting to the AI agent (${errData.error || res.statusText}). Feel free to ask me again or switch to local edge mode in settings!`,
+      };
     }
 
     const data = await res.json();
     const reply = data.reply || '';
 
-    // Also run edge parser to generate execution plan & action if intent is detected
+    // Check if user input also triggered a concrete ledger action (e.g. logging a transaction)
     const edgePlan = runEdgeCognition(userInput, context);
+    const hasConcreteAction = Boolean(edgePlan.action);
 
     return {
       content: reply,
-      plan: edgePlan.plan,
+      plan: hasConcreteAction ? edgePlan.plan : undefined,
       action: edgePlan.action,
-      measurableValue: edgePlan.measurableValue,
+      measurableValue: hasConcreteAction ? edgePlan.measurableValue : undefined,
       memoryNote: edgePlan.memoryNote,
       updatedMemory: edgePlan.updatedMemory
     };
   } catch (err) {
-    console.warn('Network error reaching LLM server, falling back to local edge engine:', err);
-    return runEdgeCognition(userInput, context);
+    console.warn('Network error reaching LLM server:', err);
+    if (config.useEdgeFallback) {
+      return runEdgeCognition(userInput, context);
+    }
+    return {
+      content: 'Could not connect to the AI Agent server right now. Feel free to try again or switch to local edge mode in settings!',
+    };
   }
 }

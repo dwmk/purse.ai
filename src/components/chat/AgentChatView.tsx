@@ -143,11 +143,11 @@ export const AgentChatView: React.FC = () => {
 
 
   const quickPrompts = [
+    'Hey Fiona! How are my finances looking today?',
+    'Can I afford a $45 dinner out tonight?',
     'Spent $42.50 at Trader Joe\'s',
-    'Can I afford $120 dinner out tonight?',
     'What is my zero-income cash runway?',
-    'Audit recurring subscriptions for leaks',
-    'Add rule: emergency savings target is $16,000'
+    'Audit recurring subscriptions for leaks'
   ];
 
   const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];

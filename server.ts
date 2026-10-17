@@ -72,17 +72,39 @@ async function startServer() {
           parts: [{ text: m.content }]
         }));
 
-        const response = await client.models.generateContent({
-          model: model || 'gemini-flash-latest',
-          contents,
-          config: {
-            systemInstruction: systemInstruction || undefined,
-            temperature,
-          }
-        });
+        const selectedModel = (!model || model === 'gemini-flash-latest' || model === 'gemini-2.5-flash')
+          ? 'gemini-3.8-flash'
+          : model;
 
-        const reply = response.text || '';
-        return res.json({ reply, provider: 'gemini', model: model || 'gemini-flash-latest' });
+        let reply = '';
+        let lastErr: any = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await client.models.generateContent({
+              model: selectedModel,
+              contents,
+              config: {
+                systemInstruction: systemInstruction || undefined,
+                temperature,
+              }
+            });
+            reply = response.text || '';
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            console.warn(`Gemini generateContent attempt ${attempt + 1} failed:`, err?.message || err);
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+            }
+          }
+        }
+
+        if (!reply && lastErr) {
+          throw lastErr;
+        }
+
+        return res.json({ reply, provider: 'gemini', model: selectedModel });
       }
 
       // 2. OPENAI PROVIDER
@@ -275,17 +297,30 @@ Return ONLY a valid JSON object with the following schema (no markdown formattin
           httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
         }) : ai;
 
-        const response = await client.models.generateContent({
-          model: model || 'gemini-flash-latest',
-          contents: [{ role: 'user', parts: [{ text: `Analyze and organize these financial transactions into JSON:\n\n${text}` }] }],
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
-            temperature: 0.1,
-          }
-        });
+        const selectedModel = (!model || model === 'gemini-flash-latest' || model === 'gemini-2.5-flash')
+          ? 'gemini-3.8-flash'
+          : model;
 
-        const reply = response.text || '{}';
+        let reply = '{}';
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const response = await client.models.generateContent({
+              model: selectedModel,
+              contents: [{ role: 'user', parts: [{ text: `Analyze and organize these financial transactions into JSON:\n\n${text}` }] }],
+              config: {
+                systemInstruction: systemPrompt,
+                responseMimeType: 'application/json',
+                temperature: 0.1,
+              }
+            });
+            reply = response.text || '{}';
+            break;
+          } catch (err) {
+            console.warn(`Gemini organize attempt ${attempt + 1} failed:`, err);
+            if (attempt < 2) await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+          }
+        }
+
         try {
           const parsed = JSON.parse(reply.replace(/```json/g, '').replace(/```/g, '').trim());
           return res.json({ organized: parsed, provider: 'gemini' });

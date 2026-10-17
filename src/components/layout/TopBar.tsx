@@ -9,7 +9,8 @@ import {
   Settings,
   ArrowRight,
   PanelLeft,
-  Plus
+  Plus,
+  Box
 } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -93,7 +94,7 @@ export const TopBar: React.FC = () => {
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'
               }`}
             >
-              Copilot Chat
+              Chat
             </button>
             <button
               onClick={() => setCurrentView('overview')}
@@ -144,14 +145,15 @@ export const TopBar: React.FC = () => {
           {/* 3D / 2D Avatar Toggle Button */}
           <button
             onClick={toggle3DMode}
-            title={is3DMode ? '3D Fiona Avatar Active (Click to switch to 2D)' : '2D View Active (Click to switch to 3D Fiona Avatar)'}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-mono font-bold rounded-xl border transition-all cursor-pointer tactile-btn ${
+            title={is3DMode ? '3D Fiona Avatar Active (Click to switch to 2D)' : '3D Mode Inactive (Click to switch to 3D Fiona Avatar)'}
+            aria-label="Toggle 3D Avatar"
+            className={`p-2 rounded-xl border transition-all cursor-pointer tactile-btn ${
               is3DMode
                 ? 'border-violet-600 bg-violet-600 text-white shadow-xs'
                 : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
             }`}
           >
-            <span className="text-[11px]">3D</span>
+            <Box className="w-4 h-4" />
           </button>
 
           {/* TTS Audio Voice Toggle with immediate speech cutoff */}

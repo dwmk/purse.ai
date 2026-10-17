@@ -15,7 +15,7 @@ export const BottomDock: React.FC = () => {
   if (currentView === 'landing') return null;
 
   const tabs: { label: string; view: AppView; icon: React.ReactNode }[] = [
-    { label: 'Copilot', view: 'chat', icon: <MessageSquare className="w-4 h-4" /> },
+    { label: 'Chat', view: 'chat', icon: <MessageSquare className="w-4 h-4" /> },
     { label: 'Wallet', view: 'overview', icon: <Wallet className="w-4 h-4" /> },
     { label: 'Envelopes', view: 'budgets', icon: <PieChart className="w-4 h-4" /> },
     { label: 'Bills', view: 'bills', icon: <Calendar className="w-4 h-4" /> },

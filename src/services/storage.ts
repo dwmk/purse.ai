@@ -422,9 +422,9 @@ export const SEED_MEMORY_FILE: MemoryFile = {
 };
 
 export const SEED_CONFIG: LLMConfig = {
-  provider: 'edge', // default browser-based
-  model: 'smolLM2-360M-instruct',
-  useEdgeFallback: true,
+  provider: 'gemini', // default server-side AI Agent powered by Gemini 3.8
+  model: 'gemini-3.8-flash',
+  useEdgeFallback: false,
   autoApproveSafeActions: false
 };
 
@@ -438,7 +438,7 @@ export const SEED_CONVERSATIONS: ConversationSession[] = [
       {
         id: 'msg_welcome',
         sender: 'agent',
-        content: 'Hello! I am **Purse**, your personal AI finance assistant. I operate privately in your browser storage with zero cloud tracking. What would you like to log or review today?',
+        content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
         timestamp: '2026-10-16T09:30:00.000Z'
       },
       {
@@ -450,7 +450,7 @@ export const SEED_CONVERSATIONS: ConversationSession[] = [
       {
         id: 'msg_a1',
         sender: 'agent',
-        content: "I parsed your intent to record **$42.50** for **Trader Joe's** categorized under **Groceries**.\n\n- **Impact:** -$42.50 to Primary Operating Checking\n- **Projected Balance:** $3,798.00\n- **Envelope Headroom:** $297.50 remaining in Groceries\n\nExecution plan ready.",
+        content: "Got it! I recorded **$42.50** for **Trader Joe's** under your **Groceries** envelope. You still have about $297.50 left for groceries this month, so you're in great shape!",
         timestamp: '2026-10-16T09:32:02.000Z'
       }
     ]
@@ -510,7 +510,7 @@ export const SEED_CONVERSATIONS: ConversationSession[] = [
       {
         id: 'msg_a_dining',
         sender: 'agent',
-        content: "### Affordability Evaluation: $120.00 for Dining & Nightlife\n\n- **Envelope Headroom:** $225.00 remaining in Dining & Nightlife.\n- **Checking Cushion:** Checking balance will remain comfortably above your $1,200.00 floor ($3,720.50).\n\n✅ **Approved for Safe Execution**: This expenditure fits your discretionary budget envelope.",
+        content: "Yes, you can totally afford it! You have about $225 remaining in your Dining envelope this month, and your checking balance will comfortably stay at $3,720.50 (well above your $1,200 safety floor). Have a wonderful dinner tonight!",
         timestamp: '2026-09-12T19:40:02.000Z'
       }
     ]
@@ -730,7 +730,7 @@ export const StorageService = {
           {
             id: 'msg_welcome',
             sender: 'agent',
-            content: 'Hello! I am **Fiona**, your personal autonomous finance companion. Welcome to Purse! I operate privately in your browser storage with zero external tracking. What would you like to log or review today?',
+            content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
             timestamp: new Date().toISOString()
           }
         ]
@@ -782,7 +782,14 @@ export const StorageService = {
       return SEED_CONFIG;
     }
     try {
-      return { ...SEED_CONFIG, ...JSON.parse(raw) };
+      const parsed = JSON.parse(raw);
+      if (!parsed.provider || parsed.provider === 'edge' || parsed.model === 'gemini-flash-latest' || parsed.model === 'gemini-2.5-flash') {
+        parsed.provider = 'gemini';
+        parsed.model = 'gemini-3.8-flash';
+        parsed.useEdgeFallback = false;
+        localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(parsed));
+      }
+      return { ...SEED_CONFIG, ...parsed };
     } catch {
       return SEED_CONFIG;
     }

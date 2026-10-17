@@ -39,7 +39,7 @@ export const FionaAvatar: React.FC = () => {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const vrmRef = useRef<VRM | null>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
-  const clockRef = useRef<THREE.Clock>(new THREE.Clock());
+  const timerRef = useRef<THREE.Timer>(new THREE.Timer());
   const isInitializedRef = useRef<boolean>(false);
 
   // Rotation interaction state with spring return
@@ -64,14 +64,14 @@ export const FionaAvatar: React.FC = () => {
 
     cameraRef.current.fov = 30;
     if (isChatView) {
-      // Zoomed-out waist-length portrait framing in Chat view
+      // Zoomed-out waist-length portrait framing in Chat view (framed comfortably lower)
       const isMobile = width < 640;
-      cameraRef.current.position.set(0, 0.82, isMobile ? 2.30 : 2.05);
-      cameraRef.current.lookAt(0, 0.70, 0);
+      cameraRef.current.position.set(0, 0.68, isMobile ? 2.35 : 2.12);
+      cameraRef.current.lookAt(0, 0.52, 0);
     } else {
       // PIP mode in bottom-left corner
-      cameraRef.current.position.set(0, 0.82, 2.15);
-      cameraRef.current.lookAt(0, 0.70, 0);
+      cameraRef.current.position.set(0, 0.68, 2.22);
+      cameraRef.current.lookAt(0, 0.52, 0);
     }
 
     cameraRef.current.updateProjectionMatrix();
@@ -86,10 +86,10 @@ export const FionaAvatar: React.FC = () => {
     const scene = new THREE.Scene();
     sceneRef.current = scene;
 
-    // Perspective Camera setup: zoomed out waist-height framing
+    // Perspective Camera setup: zoomed out waist-height framing lowered
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 20.0);
-    camera.position.set(0, 0.82, 2.05);
-    camera.lookAt(0, 0.70, 0);
+    camera.position.set(0, 0.68, 2.12);
+    camera.lookAt(0, 0.52, 0);
     cameraRef.current = camera;
 
     // WebGL Renderer with full alpha transparency
@@ -102,7 +102,7 @@ export const FionaAvatar: React.FC = () => {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.96;
     rendererRef.current = renderer;
 
     // Studio Environment lighting
@@ -117,25 +117,25 @@ export const FionaAvatar: React.FC = () => {
       console.warn('RoomEnvironment fallback:', e);
     }
 
-    // 3-Point Studio Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+    // Warm, flattering 3-point portrait lighting to eliminate washed-out paleness
+    const ambientLight = new THREE.AmbientLight(0xfff3e6, 0.65);
     scene.add(ambientLight);
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444455, 0.9);
+    const hemiLight = new THREE.HemisphereLight(0xffebe0, 0x4a3c3c, 0.55);
     hemiLight.position.set(0, 5, 0);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfff5ea, 1.8);
-    keyLight.position.set(1.5, 2.5, 2.0);
+    const keyLight = new THREE.DirectionalLight(0xffeedb, 1.15);
+    keyLight.position.set(1.4, 2.2, 1.8);
     scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0xddeeff, 1.5);
-    rimLight.position.set(-1.5, 2.2, -1.8);
-    scene.add(rimLight);
-
-    const fillLight = new THREE.DirectionalLight(0xf8eeff, 0.9);
-    fillLight.position.set(-1.0, 1.5, 1.5);
+    const fillLight = new THREE.DirectionalLight(0xffdfd2, 0.65);
+    fillLight.position.set(-1.2, 1.4, 1.5);
     scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xdbe3f5, 0.65);
+    rimLight.position.set(-1.4, 2.0, -1.8);
+    scene.add(rimLight);
 
     // Initial sizing
     updateDimensions();
@@ -144,8 +144,8 @@ export const FionaAvatar: React.FC = () => {
     const applyVRM = (vrm: VRM) => {
       vrmRef.current = vrm;
       vrm.scene.rotation.y = 0;
-      // Lower model vertically so waist is cleanly visible in frame
-      vrm.scene.position.set(0, -0.42, 0);
+      // Lower model vertically so waist and torso are framed comfortably lower
+      vrm.scene.position.set(0, -0.56, 0);
       scene.add(vrm.scene);
 
       // Dismiss loading overlay immediately: Fiona is visible in scene!
@@ -242,8 +242,9 @@ export const FionaAvatar: React.FC = () => {
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
 
-      const delta = clockRef.current.getDelta();
-      const elapsed = clockRef.current.getElapsedTime();
+      timerRef.current.update();
+      const delta = Math.min(timerRef.current.getDelta(), 0.1);
+      const elapsed = timerRef.current.getElapsed();
 
       // Smooth damping back to frontal angle (0) when released
       if (!isDraggingRef.current) {
@@ -380,7 +381,7 @@ export const FionaAvatar: React.FC = () => {
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {}
 
-    // Tap in PIP mode returns to full Copilot Chat view
+    // Tap in PIP mode returns to full Chat view
     if (!isChatView && totalDragDeltaRef.current < 6) {
       setCurrentView('chat');
     }
@@ -407,7 +408,7 @@ export const FionaAvatar: React.FC = () => {
           isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
         } ${
           isChatView
-            ? 'fixed inset-0 top-14 pb-16 z-20 flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
+            ? 'fixed inset-0 top-16 pb-20 z-20 flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing'
             : 'fixed bottom-16 sm:bottom-6 left-4 sm:left-6 w-44 h-64 sm:w-56 sm:h-80 z-30 pointer-events-auto cursor-grab active:cursor-grabbing hover:scale-105 transition-transform'
         }`}
         title={

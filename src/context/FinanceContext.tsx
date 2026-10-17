@@ -17,6 +17,7 @@ import { StorageService } from '../services/storage';
 import { processAgentMessage } from '../services/agentEngine';
 import { SpeechService, registerSubtitleListener, getFionaGreeting } from '../services/speech';
 import { OrganizedIngestionResult } from '../services/ingestion';
+import { vectorDb } from '../services/vectorDb';
 
 interface FinanceContextType {
   accounts: Account[];
@@ -140,7 +141,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         {
           id: `msg_welcome_${Date.now()}`,
           sender: 'agent',
-          content: 'Hello! I am **Purse**, your personal AI finance assistant. I operate privately in your browser storage with zero cloud tracking. What would you like to log or review today?',
+          content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
           timestamp: new Date().toISOString()
         }
       ]
@@ -164,7 +165,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
           {
             id: `msg_welcome_${Date.now()}`,
             sender: 'agent',
-            content: 'Hello! I am **Purse**, your personal AI finance assistant. What would you like to log or review today?',
+            content: "Hey there! I'm **Fiona**, your personal finance secretary and accountant. Everything is kept 100% private in your browser with our local vector database and memory core. How can I help you today? Feel free to ask anything, log an expense, or check on your budgets!",
             timestamp: new Date().toISOString()
           }
         ]
@@ -222,9 +223,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     action?: { label: string; onClick: () => void };
   } | null>(null);
 
-  // 3D Mode & Subtitle states
+  // 3D Mode & Subtitle states (Default is OFF unless explicitly enabled)
   const [is3DMode, setIs3DModeState] = useState<boolean>(() => {
-    return localStorage.getItem('purse_3d_mode') !== 'false';
+    return localStorage.getItem('purse_3d_mode') === 'true';
   });
   const [activeSubtitle, setActiveSubtitle] = useState<string>('');
   const [isAvatarSpeaking, setIsAvatarSpeaking] = useState<boolean>(false);
@@ -312,6 +313,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
     }
   }, []);
+
+  // Sync latest ledger snapshot to Browser Vector Database
+  useEffect(() => {
+    try {
+      vectorDb.syncLedgerContext({ accounts, transactions, bills, budgets, memory });
+    } catch (e) {
+      console.warn('[VectorDB] Auto-sync notice:', e);
+    }
+  }, [accounts, transactions, bills, budgets, memory]);
 
   // Sync Speech Preference
   useEffect(() => {
