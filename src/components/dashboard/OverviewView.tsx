@@ -21,7 +21,16 @@ export const OverviewView: React.FC = () => {
   } = useFinance();
 
   const [activeAccountIdx, setActiveAccountIdx] = useState(0);
-  const activeAccount = accounts[activeAccountIdx] || accounts[0];
+  const activeAccount = accounts[activeAccountIdx] || accounts[0] || {
+    id: 'acc_default',
+    name: 'Primary Account',
+    type: 'checking' as const,
+    balance: 0,
+    currency: 'USD',
+    institution: 'Purse Vault',
+    accountNumberMask: '•••• 0001',
+    lastUpdated: new Date().toISOString()
+  };
 
   const totalLiquid = accounts
     .filter(a => a.type === 'checking' || a.type === 'savings')
@@ -31,8 +40,8 @@ export const OverviewView: React.FC = () => {
     .filter(b => b.type === 'need')
     .reduce((sum, b) => sum + b.allocated, 0);
 
-  const runwayMonths = monthlyEssentialNeeds > 0 ? (totalLiquid / monthlyEssentialNeeds).toFixed(1) : '5.0';
-  const safeDailySpend = '74.20';
+  const runwayMonths = monthlyEssentialNeeds > 0 ? (totalLiquid / monthlyEssentialNeeds).toFixed(1) : (totalLiquid > 0 ? '12.0+' : '0.0');
+  const safeDailySpend = monthlyEssentialNeeds > 0 ? Math.max(0, (totalLiquid - monthlyEssentialNeeds) / 30).toFixed(2) : Math.max(0, totalLiquid / 30).toFixed(2);
 
   const recentTxs = transactions.slice(0, 6);
   const appliedActions = actions.filter(a => a.status === 'applied');
@@ -135,33 +144,45 @@ export const OverviewView: React.FC = () => {
           </button>
         </div>
 
-        <div className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-xs">
-          {recentTxs.map(t => {
-            const isIncome = t.type === 'income';
-            return (
-              <div key={t.id} className="py-3 flex items-center justify-between">
-                <div>
-                  <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">{t.merchant}</div>
-                  <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    {t.date} · {t.category}
+        {recentTxs.length === 0 ? (
+          <div className="py-8 text-center text-xs font-mono text-zinc-500 space-y-2">
+            <p>No transactions logged yet.</p>
+            <button
+              onClick={() => setCurrentView('chat')}
+              className="text-violet-600 dark:text-violet-400 font-bold hover:underline cursor-pointer"
+            >
+              Log your first transaction with Fiona in Chat &rarr;
+            </button>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-200 dark:divide-zinc-800 font-mono text-xs">
+            {recentTxs.map(t => {
+              const isIncome = t.type === 'income';
+              return (
+                <div key={t.id} className="py-3 flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm">{t.merchant}</div>
+                    <div className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      {t.date} · {t.category}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`font-bold tabular-nums text-xs sm:text-sm ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                      {isIncome ? '+' : '-'}${t.amount.toFixed(2)}
+                    </span>
+                    <button
+                      onClick={() => deleteTransaction(t.id)}
+                      aria-label={`Delete ${t.merchant}`}
+                      className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={`font-bold tabular-nums text-xs sm:text-sm ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
-                    {isIncome ? '+' : '-'}${t.amount.toFixed(2)}
-                  </span>
-                  <button
-                    onClick={() => deleteTransaction(t.id)}
-                    aria-label={`Delete ${t.merchant}`}
-                    className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Applied Agent Actions with 1-Click Undo */}

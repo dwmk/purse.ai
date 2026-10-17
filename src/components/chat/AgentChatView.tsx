@@ -16,8 +16,12 @@ import {
   ShieldCheck,
   AlertCircle,
   Cpu,
-  Check
+  Check,
+  HardDrive,
+  Loader2
 } from 'lucide-react';
+import { MODEL_OPTIONS, MODEL_LOGOS } from '../../constants/models';
+import { BrowserLMService } from '../../services/browserLm';
 
 export const AgentChatView: React.FC = () => {
   const {
@@ -36,12 +40,18 @@ export const AgentChatView: React.FC = () => {
     accounts,
     config,
     updateConfig,
+    openSettingsForProvider
   } = useFinance();
 
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
   const [showModelMenu, setShowModelMenu] = useState(false);
+
+  // Browser LM download progress states
+  const [browserLmProgress, setBrowserLmProgress] = useState<number>(0);
+  const [browserLmMsg, setBrowserLmMsg] = useState<string>('');
+  const [isBrowserLmDownloading, setIsBrowserLmDownloading] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -130,8 +140,7 @@ export const AgentChatView: React.FC = () => {
     await sendMessage(text);
   };
 
-  const checkingBal = accounts.find(a => a.type === 'checking')?.balance || 0;
-  const safeDailySpend = '74.20';
+
 
   const quickPrompts = [
     'Spent $42.50 at Trader Joe\'s',
@@ -141,15 +150,25 @@ export const AgentChatView: React.FC = () => {
     'Add rule: emergency savings target is $16,000'
   ];
 
-  const modelOptions: { id: LLMProvider; name: string; tag: string }[] = [
-    { id: 'edge', name: 'Browser Edge (Local)', tag: 'smolLM2 / Offline' },
-    { id: 'gemini', name: 'Google Gemini', tag: 'gemini-3.8-flash' },
-    { id: 'openai', name: 'OpenAI', tag: 'gpt-4o-mini' },
-    { id: 'deepseek', name: 'DeepSeek', tag: 'deepseek-chat' },
-    { id: 'zai', name: 'Z.ai / Zhipu', tag: 'glm-4-flash' }
-  ];
+  const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];
+  const isCurrentKeyMissing = currentModel.isApiBased && !config.apiKey?.trim();
 
-  const currentModelLabel = modelOptions.find(m => m.id === config.provider)?.name || 'Edge Engine';
+  const handleSelectModel = (opt: typeof MODEL_OPTIONS[0]) => {
+    updateConfig({ provider: opt.id, model: opt.model });
+    setShowModelMenu(false);
+
+    if (opt.id === 'edge' && !BrowserLMService.checkIfCached()) {
+      setIsBrowserLmDownloading(true);
+      BrowserLMService.subscribe(st => {
+        setBrowserLmProgress(st.progress);
+        setBrowserLmMsg(st.message);
+        if (st.status === 'ready') {
+          setIsBrowserLmDownloading(false);
+        }
+      });
+      BrowserLMService.startDownload();
+    }
+  };
 
   return (
     <div className={`max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col font-sans ${is3DMode ? 'h-[calc(100vh-4.25rem)] justify-end relative z-30 pointer-events-none' : 'h-[calc(100vh-4.25rem)]'}`}>
@@ -356,36 +375,85 @@ export const AgentChatView: React.FC = () => {
       {/* Chat Input Panel with Drop-up Model Selector on Left, Mic beside Send on Right */}
       <form onSubmit={handleSend} className={`shrink-0 relative pointer-events-auto ${is3DMode ? 'max-w-2xl mx-auto w-full pb-2' : 'pt-1'}`}>
         
-        {/* Model Drop-up Menu */}
+        {/* Missing API Key Warning with Fix Button */}
+        {isCurrentKeyMissing && (
+          <div className="mb-2 p-2.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl flex items-center justify-between text-xs font-mono text-rose-700 dark:text-rose-300 shadow-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+              <span className="truncate">Missing API key for {currentModel.name}.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => openSettingsForProvider(config.provider)}
+              className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-[11px] cursor-pointer shrink-0 transition-colors shadow-xs"
+            >
+              Fix in Settings
+            </button>
+          </div>
+        )}
+
+        {/* Browser LM Download Progress Bar */}
+        {config.provider === 'edge' && isBrowserLmDownloading && (
+          <div className="mb-2 p-3 bg-white dark:bg-[#121216] border border-violet-500/30 rounded-2xl space-y-1.5 font-mono text-xs shadow-md animate-in fade-in duration-150">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-violet-600 dark:text-violet-400 font-bold flex items-center gap-1.5">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>{browserLmMsg || 'Downloading neural model weights...'}</span>
+              </span>
+              <span className="font-bold">{browserLmProgress}%</span>
+            </div>
+            <div className="w-full bg-zinc-100 dark:bg-zinc-800 h-1.5 rounded-full overflow-hidden">
+              <div
+                className="bg-violet-600 h-full transition-all duration-150 rounded-full"
+                style={{ width: `${browserLmProgress}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-zinc-400 block">
+              Model will be saved in browser CacheStorage for persistent instant preloading.
+            </span>
+          </div>
+        )}
+
+        {/* Model Drop-up Menu with Provider Logos */}
         {showModelMenu && (
           <div
             ref={modelMenuRef}
-            className="absolute bottom-16 left-0 z-50 w-64 p-2 bg-white dark:bg-[#121216] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl font-mono text-xs space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-150"
+            className="absolute bottom-16 left-0 z-50 w-72 p-2 bg-white dark:bg-[#121216] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-2xl font-mono text-xs space-y-1 animate-in fade-in slide-in-from-bottom-2 duration-150"
           >
             <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
               Select AI Reasoning Engine
             </div>
-            {modelOptions.map(opt => {
+            {MODEL_OPTIONS.map(opt => {
               const isSelected = config.provider === opt.id;
               return (
                 <button
                   type="button"
                   key={opt.id}
-                  onClick={() => {
-                    updateConfig({ provider: opt.id, model: opt.tag.includes('/') ? 'smolLM2-360M-instruct' : opt.tag });
-                    setShowModelMenu(false);
-                  }}
+                  onClick={() => handleSelectModel(opt)}
                   className={`w-full text-left px-3 py-2 rounded-xl flex items-center justify-between transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-violet-600 text-white font-bold shadow-xs'
                       : 'hover:bg-zinc-100 dark:hover:bg-zinc-850 text-zinc-800 dark:text-zinc-200'
                   }`}
                 >
-                  <div>
-                    <div className="text-xs">{opt.name}</div>
-                    <div className="text-[10px] opacity-75">{opt.tag}</div>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {opt.logo ? (
+                      <img
+                        src={opt.logo}
+                        alt={opt.name}
+                        className="w-6 h-6 rounded-md object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-6 h-6 rounded-md bg-zinc-200 dark:bg-zinc-800 text-violet-500 flex items-center justify-center shrink-0">
+                        <Cpu className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-xs truncate">{opt.name}</div>
+                      <div className="text-[10px] opacity-75 truncate">{opt.tag}</div>
+                    </div>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                  {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
                 </button>
               );
             })}
@@ -394,15 +462,23 @@ export const AgentChatView: React.FC = () => {
 
         <div className="flex items-center gap-1.5 p-1.5 bg-white dark:bg-[#121216] rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-md focus-within:border-violet-500 transition-all">
           
-          {/* 1. Model Selector Button (Left Side, Opens Drop-up) */}
+          {/* 1. Model Selector Button (Left Side, Opens Drop-up) with Logo */}
           <button
             type="button"
             onClick={() => setShowModelMenu(!showModelMenu)}
             title="Choose AI Model"
-            className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 text-[11px] font-mono text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 text-[11px] font-mono text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-colors cursor-pointer shrink-0"
           >
-            <Cpu className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
-            <span className="hidden sm:inline font-semibold">{currentModelLabel.split(' ')[0]}</span>
+            {currentModel.logo ? (
+              <img
+                src={currentModel.logo}
+                alt={currentModel.name}
+                className="w-4 h-4 rounded-md object-cover border border-zinc-200 dark:border-zinc-700 shrink-0"
+              />
+            ) : (
+              <Cpu className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400 shrink-0" />
+            )}
+            <span className="hidden sm:inline font-semibold">{currentModel.name.split(' ')[0]}</span>
             <ChevronUp className="w-3 h-3 text-zinc-400" />
           </button>
 

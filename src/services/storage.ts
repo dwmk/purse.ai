@@ -570,16 +570,24 @@ export const StorageService = {
     return null;
   },
 
+  isInitialized(): boolean {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('purse_initialized_v2') === 'true' && this.getAccounts().length > 0;
+  },
+
+  setInitialized(value: boolean): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('purse_initialized_v2', value ? 'true' : 'false');
+  },
+
   getAccounts(): Account[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.ACCOUNTS, LEGACY_KEYS.ACCOUNTS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(SEED_ACCOUNTS));
-      return SEED_ACCOUNTS;
-    }
+    const raw = localStorage.getItem(STORAGE_KEYS.ACCOUNTS);
+    if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return SEED_ACCOUNTS;
+      return [];
     }
   },
 
@@ -588,15 +596,13 @@ export const StorageService = {
   },
 
   getTransactions(): Transaction[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.TRANSACTIONS, LEGACY_KEYS.TRANSACTIONS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(SEED_TRANSACTIONS));
-      return SEED_TRANSACTIONS;
-    }
+    const raw = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
+    if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return SEED_TRANSACTIONS;
+      return [];
     }
   },
 
@@ -605,15 +611,13 @@ export const StorageService = {
   },
 
   getBills(): Bill[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.BILLS, LEGACY_KEYS.BILLS);
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(SEED_BILLS));
-      return SEED_BILLS;
-    }
+    const raw = localStorage.getItem(STORAGE_KEYS.BILLS);
+    if (!raw) return [];
     try {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return SEED_BILLS;
+      return [];
     }
   },
 
@@ -622,15 +626,26 @@ export const StorageService = {
   },
 
   getBudgets(): BudgetEnvelope[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.BUDGETS, LEGACY_KEYS.BUDGETS);
+    const raw = localStorage.getItem(STORAGE_KEYS.BUDGETS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(SEED_BUDGETS));
-      return SEED_BUDGETS;
+      return [
+        { id: 'b_01', category: 'Housing & Rent', type: 'need', allocated: 0, color: '#8B5CF6' },
+        { id: 'b_02', category: 'Groceries', type: 'need', allocated: 0, color: '#A78BFA' },
+        { id: 'b_03', category: 'Utilities & Services', type: 'need', allocated: 0, color: '#C4B5FD' },
+        { id: 'b_04', category: 'Transportation & Fuel', type: 'need', allocated: 0, color: '#6366F1' },
+        { id: 'b_05', category: 'Health & Wellness', type: 'need', allocated: 0, color: '#818CF8' },
+        { id: 'b_06', category: 'Dining & Nightlife', type: 'want', allocated: 0, color: '#EC4899' },
+        { id: 'b_07', category: 'Entertainment & Leisure', type: 'want', allocated: 0, color: '#F43F5E' },
+        { id: 'b_08', category: 'Subscriptions & Software', type: 'want', allocated: 0, color: '#D946EF' },
+        { id: 'b_09', category: 'Shopping & Goods', type: 'want', allocated: 0, color: '#FB7185' },
+        { id: 'b_10', category: 'Savings & Investments', type: 'savings', allocated: 0, color: '#10B981' },
+        { id: 'b_11', category: 'Other', type: 'want', allocated: 0, color: '#64748B' }
+      ];
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return SEED_BUDGETS;
+      return [];
     }
   },
 
@@ -639,15 +654,49 @@ export const StorageService = {
   },
 
   getMemory(): MemoryFile {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.MEMORY, LEGACY_KEYS.MEMORY);
+    const raw = localStorage.getItem(STORAGE_KEYS.MEMORY);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.MEMORY, JSON.stringify(SEED_MEMORY_FILE));
-      return SEED_MEMORY_FILE;
+      const cleanMemory: MemoryFile = {
+        rawMarkdown: `# PURSE AUTONOMOUS AGENT PERSISTENT MEMORY FILE\n# Status: Fresh Ledger\n# Mode: Decentralized Local-First Edge Storage\n\n## 1. USER PROFILE\n- Monthly Net Inflow: $0.00\n- Primary Currency: USD\n\n## 2. ACTIVE BEHAVIORAL RULES\n- RULE_01: Safe execution and verification active.\n`,
+        profile: {
+          monthlyIncome: 0,
+          paydayCadence: 'monthly',
+          nextPayday: '',
+          emergencyFundTarget: 0,
+          minimumCheckingFloor: 0,
+          savingsRateTargetPercent: 20,
+          currency: 'USD'
+        },
+        rules: ['Safe execution and verification active'],
+        habits: [],
+        constraints: [],
+        unresolvedNotes: [],
+        lastUpdated: new Date().toISOString(),
+        revisionCount: 1
+      };
+      return cleanMemory;
     }
     try {
       return JSON.parse(raw);
     } catch {
-      return SEED_MEMORY_FILE;
+      return {
+        rawMarkdown: '# PURSE AUTONOMOUS AGENT PERSISTENT MEMORY FILE',
+        profile: {
+          monthlyIncome: 0,
+          paydayCadence: 'monthly',
+          nextPayday: '',
+          emergencyFundTarget: 0,
+          minimumCheckingFloor: 0,
+          savingsRateTargetPercent: 20,
+          currency: 'USD'
+        },
+        rules: [],
+        habits: [],
+        constraints: [],
+        unresolvedNotes: [],
+        lastUpdated: new Date().toISOString(),
+        revisionCount: 1
+      };
     }
   },
 
@@ -656,19 +705,8 @@ export const StorageService = {
   },
 
   getChatHistory(): ChatMessage[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.CHAT, LEGACY_KEYS.CHAT);
-    if (!raw) {
-      const initialChat: ChatMessage[] = [
-        {
-          id: 'msg_welcome',
-          sender: 'agent',
-          content: 'Hello! I am **Purse**, your personal AI finance assistant. I operate privately in your browser storage with zero cloud tracking. What would you like to log or review today?',
-          timestamp: new Date().toISOString()
-        }
-      ];
-      localStorage.setItem(STORAGE_KEYS.CHAT, JSON.stringify(initialChat));
-      return initialChat;
-    }
+    const raw = localStorage.getItem(STORAGE_KEYS.CHAT);
+    if (!raw) return [];
     try {
       return JSON.parse(raw);
     } catch {
@@ -681,17 +719,30 @@ export const StorageService = {
   },
 
   getConversations(): ConversationSession[] {
-    const raw = this.getItemWithMigration(STORAGE_KEYS.CONVERSATIONS, LEGACY_KEYS.CONVERSATIONS);
+    const raw = localStorage.getItem(STORAGE_KEYS.CONVERSATIONS);
     if (!raw) {
-      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(SEED_CONVERSATIONS));
-      return SEED_CONVERSATIONS;
+      const initialConv: ConversationSession = {
+        id: 'conv_initial',
+        title: 'New Conversation',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        messages: [
+          {
+            id: 'msg_welcome',
+            sender: 'agent',
+            content: 'Hello! I am **Fiona**, your personal autonomous finance companion. Welcome to Purse! I operate privately in your browser storage with zero external tracking. What would you like to log or review today?',
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+      return [initialConv];
     }
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      return SEED_CONVERSATIONS;
+      return [];
     } catch {
-      return SEED_CONVERSATIONS;
+      return [];
     }
   },
 
@@ -703,7 +754,7 @@ export const StorageService = {
     const saved = localStorage.getItem('purse_active_conv_id');
     if (saved) return saved;
     const convs = this.getConversations();
-    return convs[0]?.id || 'conv_current_1';
+    return convs[0]?.id || 'conv_initial';
   },
 
   saveActiveConversationId(id: string): void {
@@ -794,6 +845,8 @@ export const StorageService = {
     localStorage.removeItem('kitefi_speech_enabled');
     localStorage.removeItem('purse_speech_enabled');
     localStorage.removeItem('purse_active_conv_id');
+    localStorage.removeItem('purse_initialized_v1');
+    localStorage.removeItem('purse_initialized_v2');
   },
 
   // Export entire application state as a single JSON file

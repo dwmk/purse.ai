@@ -73,7 +73,7 @@ async function startServer() {
         }));
 
         const response = await client.models.generateContent({
-          model: model || 'gemini-3.8-flash',
+          model: model || 'gemini-flash-latest',
           contents,
           config: {
             systemInstruction: systemInstruction || undefined,
@@ -82,7 +82,7 @@ async function startServer() {
         });
 
         const reply = response.text || '';
-        return res.json({ reply, provider: 'gemini', model: model || 'gemini-3.8-flash' });
+        return res.json({ reply, provider: 'gemini', model: model || 'gemini-flash-latest' });
       }
 
       // 2. OPENAI PROVIDER
@@ -192,6 +192,203 @@ async function startServer() {
       const error = err as Error;
       console.error('Chat error:', error);
       return res.status(500).json({ error: error.message || 'Internal server error processing agent reasoning' });
+    }
+  });
+
+  // LLM Ingestion & Transaction Organizer Endpoint
+  app.post('/api/organize-transactions', async (req: Request, res: Response) => {
+    try {
+      const { text, provider = 'gemini', apiKey, model } = req.body;
+      if (!text || typeof text !== 'string' || !text.trim()) {
+        return res.status(400).json({ error: 'Transaction data or text is required' });
+      }
+
+      const systemPrompt = `You are a financial data organization engine. 
+The user will provide raw transaction text, bank statement export, CSV rows, or financial notes.
+Your task is to analyze, normalize, clean, and organize the data into a structured financial ledger format.
+
+Return ONLY a valid JSON object with the following schema (no markdown formatting, no code fences):
+{
+  "accounts": [
+    {
+      "id": "acc_primary",
+      "name": "string (e.g. Primary Checking)",
+      "type": "checking" | "savings" | "credit" | "investment",
+      "balance": number,
+      "currency": "USD",
+      "institution": "string (e.g. Bank)",
+      "accountNumberMask": "string (e.g. •••• 1234)"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx_1",
+      "date": "YYYY-MM-DD",
+      "amount": number (positive value),
+      "type": "expense" | "income" | "transfer",
+      "category": "Housing & Rent" | "Groceries" | "Utilities & Services" | "Dining & Nightlife" | "Transportation & Fuel" | "Health & Wellness" | "Subscriptions & Software" | "Entertainment & Leisure" | "Shopping & Goods" | "Savings & Investments" | "Other",
+      "merchant": "string",
+      "note": "string",
+      "accountId": "acc_primary",
+      "autoCategorized": true
+    }
+  ],
+  "bills": [
+    {
+      "id": "bill_1",
+      "name": "string (e.g. Netflix)",
+      "amount": number,
+      "category": "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent",
+      "frequency": "monthly",
+      "dueDate": "YYYY-MM-DD",
+      "isAutopay": boolean,
+      "isPaidThisCycle": boolean,
+      "status": "upcoming"
+    }
+  ],
+  "budgets": [
+    {
+      "id": "b_1",
+      "category": "Groceries",
+      "type": "need" | "want" | "savings",
+      "allocated": number,
+      "color": "string"
+    }
+  ],
+  "summary": {
+    "totalInflow": number,
+    "totalOutflow": number,
+    "netSavings": number,
+    "suggestedMonthlyIncome": number
+  }
+}`;
+
+      // 1. GEMINI
+      if (provider === 'gemini') {
+        const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+        if (!keyToUse || keyToUse === 'MY_GEMINI_API_KEY') {
+          return res.status(400).json({ error: 'Missing Gemini API key for transaction organization' });
+        }
+
+        const client = apiKey ? new GoogleGenAI({
+          apiKey,
+          httpOptions: { headers: { 'User-Agent': 'aistudio-build' } }
+        }) : ai;
+
+        const response = await client.models.generateContent({
+          model: model || 'gemini-flash-latest',
+          contents: [{ role: 'user', parts: [{ text: `Analyze and organize these financial transactions into JSON:\n\n${text}` }] }],
+          config: {
+            systemInstruction: systemPrompt,
+            responseMimeType: 'application/json',
+            temperature: 0.1,
+          }
+        });
+
+        const reply = response.text || '{}';
+        try {
+          const parsed = JSON.parse(reply.replace(/```json/g, '').replace(/```/g, '').trim());
+          return res.json({ organized: parsed, provider: 'gemini' });
+        } catch {
+          return res.json({ organized: null, raw: reply, provider: 'gemini' });
+        }
+      }
+
+      // 2. OPENAI
+      if (provider === 'openai') {
+        if (!apiKey) return res.status(400).json({ error: 'OpenAI API key is required' });
+        const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Analyze and organize these financial transactions into JSON:\n\n${text}` }
+            ],
+            response_format: { type: 'json_object' },
+            temperature: 0.1
+          })
+        });
+
+        if (!openAiRes.ok) {
+          const errText = await openAiRes.text();
+          return res.status(openAiRes.status).json({ error: `OpenAI error: ${errText}` });
+        }
+
+        const data = await openAiRes.json();
+        const content = data.choices?.[0]?.message?.content || '{}';
+        return res.json({ organized: JSON.parse(content), provider: 'openai' });
+      }
+
+      // 3. DEEPSEEK
+      if (provider === 'deepseek') {
+        if (!apiKey) return res.status(400).json({ error: 'DeepSeek API key is required' });
+        const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'deepseek-chat',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Analyze and organize these financial transactions into JSON:\n\n${text}` }
+            ],
+            temperature: 0.1
+          })
+        });
+
+        if (!dsRes.ok) {
+          const errText = await dsRes.text();
+          return res.status(dsRes.status).json({ error: `DeepSeek error: ${errText}` });
+        }
+
+        const data = await dsRes.json();
+        const content = data.choices?.[0]?.message?.content || '{}';
+        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        return res.json({ organized: JSON.parse(cleaned), provider: 'deepseek' });
+      }
+
+      // 4. Z.AI
+      if (provider === 'zai') {
+        if (!apiKey) return res.status(400).json({ error: 'Z.ai API key is required' });
+        const zaiRes = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'glm-4-flash',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Analyze and organize these financial transactions into JSON:\n\n${text}` }
+            ],
+            temperature: 0.1
+          })
+        });
+
+        if (!zaiRes.ok) {
+          const errText = await zaiRes.text();
+          return res.status(zaiRes.status).json({ error: `Z.ai error: ${errText}` });
+        }
+
+        const data = await zaiRes.json();
+        const content = data.choices?.[0]?.message?.content || '{}';
+        const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        return res.json({ organized: JSON.parse(cleaned), provider: 'zai' });
+      }
+
+      return res.status(400).json({ error: `Unsupported provider: ${provider}` });
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error('Organize transactions error:', error);
+      return res.status(500).json({ error: error.message || 'Error processing transactions' });
     }
   });
 

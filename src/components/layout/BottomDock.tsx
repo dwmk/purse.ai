@@ -7,6 +7,7 @@ import {
   PieChart,
   Calendar,
   Brain,
+  FileSpreadsheet
 } from 'lucide-react';
 
 export const BottomDock: React.FC = () => {
@@ -17,28 +18,29 @@ export const BottomDock: React.FC = () => {
   const tabs: { label: string; view: AppView; icon: React.ReactNode }[] = [
     { label: 'Copilot', view: 'chat', icon: <MessageSquare className="w-4 h-4" /> },
     { label: 'Wallet', view: 'overview', icon: <Wallet className="w-4 h-4" /> },
+    { label: 'Ledger', view: 'ledger', icon: <FileSpreadsheet className="w-4 h-4" /> },
     { label: 'Envelopes', view: 'budgets', icon: <PieChart className="w-4 h-4" /> },
     { label: 'Bills', view: 'bills', icon: <Calendar className="w-4 h-4" /> },
     { label: 'Memory', view: 'memory', icon: <Brain className="w-4 h-4" /> }
   ];
 
   return (
-    <div className="sm:hidden fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-sm w-[92%]">
-      <nav className="p-1.5 rounded-full border border-zinc-200/80 dark:border-zinc-800/80 bg-white/90 dark:bg-[#121216]/90 backdrop-blur-md shadow-2xl flex items-center justify-around">
+    <div className="md:hidden fixed bottom-3 left-1/2 -translate-x-1/2 z-40 max-w-md w-[95%]">
+      <nav className="p-1.5 rounded-3xl border-2 border-violet-300/60 dark:border-violet-900/60 bg-white/95 dark:bg-[#121216]/95 backdrop-blur-lg shadow-2xl flex items-center justify-between gap-1">
         {tabs.map(t => {
           const isActive = currentView === t.view;
           return (
             <button
               key={t.view}
               onClick={() => setCurrentView(t.view)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-mono transition-all cursor-pointer ${
+              className={`flex flex-col sm:flex-row items-center justify-center gap-1 py-1.5 px-2 rounded-2xl text-[10px] sm:text-xs font-mono transition-all cursor-pointer bubbly-btn flex-1 ${
                 isActive
-                  ? 'bg-violet-600 text-white font-bold shadow-md scale-105'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  ? 'bg-violet-600 text-white font-extrabold shadow-md scale-105'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-violet-50 dark:hover:bg-zinc-800'
               }`}
             >
-              {t.icon}
-              <span className={isActive ? 'inline' : 'hidden sm:inline'}>{t.label}</span>
+              <span className="shrink-0">{t.icon}</span>
+              <span className="leading-none text-[9px] sm:text-xs">{t.label}</span>
             </button>
           );
         })}
