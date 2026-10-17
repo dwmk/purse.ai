@@ -1,1331 +1,274 @@
-import React, { useState, useEffect } from 'react';
-import { useFinance } from '../../context/FinanceContext';
-import { usePWA } from '../../hooks/usePWA';
-import {
-  Sparkles,
-  ArrowRight,
-  Shield,
-  Zap,
-  Lock,
-  Cpu,
-  Brain,
-  MessageSquare,
-  CheckCircle2,
-  Download,
-  Smartphone,
-  X,
-  Clock,
-  RotateCcw,
-  Sliders,
-  Layers,
-  Database,
-  FileText,
-  Activity,
-  Check,
-  Loader2,
-  TrendingUp,
-  BarChart3,
-  GitBranch,
-  Terminal,
-  AlertCircle,
-  Calendar,
-  DollarSign,
-  Play,
-  RefreshCw,
-  Search,
-  CheckCheck
-} from 'lucide-react';
+import React, { useEffect } from 'react';
 
+/**
+ * Purse landing page.
+ * The layout and styling are ported directly from the supplied HTML reference.
+ */
 export const LandingPage: React.FC = () => {
-  const { setCurrentView } = useFinance();
-  const { isInstalled, isInstallable, isIOS, install } = usePWA();
-
-  // If PWA is detected, automatically redirect to /app
   useEffect(() => {
-    if (isInstalled) {
-      setCurrentView('chat');
-      if (typeof window !== 'undefined') {
-        window.history.replaceState(null, '', '/app');
-      }
-    }
-  }, [isInstalled, setCurrentView]);
+    const f: [string, number, number, number, number, string][] = [
+      ["Money in checking", 640, 0, 2000, 10, "bal"],
+      ["Lowest balance you’ll allow", 100, 0, 500, 10, "floor"],
+      ["Bills still to pay", 210, 0, 800, 10, "bills"],
+      ["Days until payday", 12, 1, 30, 1, "days"]
+    ];
+    const values: Record<string, number> = {};
+    const box = document.getElementById("sliders");
+    if (!box) return;
 
-  const [showIOSModal, setShowIOSModal] = useState(false);
-
-  const handleInstallClick = async () => {
-    if (isIOS) {
-      setShowIOSModal(true);
-      return;
-    }
-    if (isInstallable) {
-      await install();
-    } else {
-      setShowIOSModal(true);
-    }
-  };
-
-  // -------------------------------------------------------------
-  // HERO: Live Cognitive Intent Simulator with Thinking & Text Streaming
-  // -------------------------------------------------------------
-  const [simPrompt, setSimPrompt] = useState("Spent $42.50 at Trader Joe's");
-  const [simState, setSimState] = useState<'idle' | 'thinking' | 'streaming' | 'complete'>('idle');
-  const [thinkingStep, setThinkingStep] = useState(0);
-  const [streamedText, setStreamedText] = useState('');
-  const [simResultData, setSimResultData] = useState<{
-    intent: string;
-    actionDetail: string;
-    impact: string;
-  } | null>(null);
-
-  const samplePrompts = [
-    "Spent $42.50 at Trader Joe's",
-    "Gained $1,200 freelance deposit",
-    "Can I afford $120 dinner tonight?",
-    "Audit subscriptions for recurring leaks"
-  ];
-
-  const runSimulation = (promptText: string) => {
-    setSimPrompt(promptText);
-    setSimState('thinking');
-    setThinkingStep(1);
-    setStreamedText('');
-    setSimResultData(null);
-
-    const lower = promptText.toLowerCase();
-    const isGain = lower.includes('gained') || lower.includes('freelance') || lower.includes('deposit') || lower.includes('salary');
-    const isAfford = lower.includes('afford') || lower.includes('dinner');
-    const isAudit = lower.includes('audit') || lower.includes('subscription');
-
-    const fullResponse = isGain
-      ? 'I parsed an incoming transaction of $1,200.00 from Client Invoice. Staged +$1,200.00 income to Checking Account. Projected liquid balance: $4,400.00. Safe daily spend increased by +$14.20/day.'
-      : isAfford
-      ? 'Evaluated $120.00 against Dining & Nightlife envelope ($155.00 remaining). Status: Approved. Post-purchase balance leaves $35.00 cushion and respects your $1,000 checking floor invariant.'
-      : isAudit
-      ? 'Audited 4 active recurring software subscriptions ($79.00/month). Flagged dormant Adobe CC subscription (inactive 42 days). Potential annual recovery: $659.88/year with zero lifestyle friction.'
-      : "Parsed transaction of $42.50 at Trader Joe's categorized under Groceries. Envelope remaining headroom: $188.00. Non-destructive ledger mutation staged with 1-click rollback guarantee.";
-
-    const intentLabel = isGain
-      ? 'INCOMING_REVENUE_LOG'
-      : isAfford
-      ? 'AFFORDABILITY_EVALUATION'
-      : isAudit
-      ? 'RECURRING_LEAK_AUDIT'
-      : 'CONVERSATIONAL_EXPENSE_LOG';
-
-    const actionText = isGain
-      ? 'Log income of $1,200.00 from Client Invoice (Savings & Investments)'
-      : isAfford
-      ? 'Discretionary check approved ($120.00 < $155.00 envelope cushion)'
-      : isAudit
-      ? 'Flagged 1 dormant subscription for cancellation review'
-      : "Log expense of $42.50 at Trader Joe's (Groceries)";
-
-    const impactText = isGain
-      ? '+$1,200.00 to Checking (Balance: $4,400.00)'
-      : isAfford
-      ? '$35.00 discretionary cushion remaining'
-      : isAudit
-      ? '$54.99/mo potential recurring savings'
-      : '-$42.50 to Groceries Envelope';
-
-    setTimeout(() => {
-      setThinkingStep(2);
-    }, 400);
-
-    setTimeout(() => {
-      setThinkingStep(3);
-    }, 850);
-
-    setTimeout(() => {
-      setSimState('streaming');
-      setSimResultData({
-        intent: intentLabel,
-        actionDetail: actionText,
-        impact: impactText
+    box.innerHTML = "";
+    f.forEach((item) => {
+      values[item[5]] = item[1];
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML =
+        "<label for='" + item[5] + "'>" + item[0] + "</label>" +
+        "<b id='v" + item[5] + "'></b>" +
+        "<input id='" + item[5] + "' type='range' min='" + item[2] +
+        "' max='" + item[3] + "' step='" + item[4] + "' value='" + item[1] + "'>";
+      box.appendChild(row);
+      const input = row.querySelector("input");
+      input?.addEventListener("input", (event) => {
+        values[item[5]] = Number((event.target as HTMLInputElement).value);
+        updateCalculator();
       });
+    });
 
-      let charIndex = 0;
-      const streamInterval = setInterval(() => {
-        if (charIndex <= fullResponse.length) {
-          setStreamedText(fullResponse.slice(0, charIndex));
-          charIndex += 2;
-        } else {
-          clearInterval(streamInterval);
-          setSimState('complete');
-        }
-      }, 14);
-    }, 1300);
-  };
+    const updateCalculator = () => {
+      f.forEach((item) => {
+        const value = document.getElementById("v" + item[5]);
+        if (value) value.textContent = item[5] === "days" ? values.days + " days" : "$" + values[item[5]];
+      });
+      const cushion = Math.max(0, values.bal - values.floor - values.bills);
+      const daily = cushion / values.days;
+      const output = document.getElementById("out");
+      if (output) {
+        output.textContent = "$" + daily.toFixed(2) + "/day";
+        output.className = daily < 10 ? "low" : "";
+      }
+      const sub = document.getElementById("sub");
+      if (sub) sub.textContent = "Cushion $" + cushion + " over " + values.days + " days. Bills and your floor are already covered.";
+    };
+    updateCalculator();
 
-  // -------------------------------------------------------------
-  // SECTION 1: Interactive Pipeline Flow (Entity Extraction)
-  // -------------------------------------------------------------
-  const [pipelineSample, setPipelineSample] = useState<number>(0);
-  const pipelineExamples = [
-    {
-      input: "Spent $34.80 at Blue Bottle Coffee yesterday",
-      type: "EXPENSE",
-      merchant: "Blue Bottle Coffee",
-      amount: "$34.80",
-      date: "Yesterday",
-      category: "Dining & Drinks",
-      confidence: 99.4,
-      invariantCheck: "Checking Floor > $1,000 (Pass)"
-    },
-    {
-      input: "Received $2,450 wire transfer for consulting project",
-      type: "INCOME",
-      merchant: "Consulting Client",
-      amount: "$2,450.00",
-      date: "Today",
-      category: "Revenue & Consulting",
-      confidence: 99.9,
-      invariantCheck: "Liquidity Floor Safe (+12.4% buffer)"
-    },
-    {
-      input: "Set aside $300 into Emergency High-Yield Savings",
-      type: "TRANSFER",
-      merchant: "Internal Vault Transfer",
-      amount: "$300.00",
-      date: "Immediate",
-      category: "Emergency Reserve",
-      confidence: 98.7,
-      invariantCheck: "Emergency Target 95% Reached"
-    }
-  ];
+    const checkboxes = Array.from(document.querySelectorAll<HTMLInputElement>(".sub input"));
+    const updateYearlySavings = () => {
+      const total = checkboxes.reduce((sum, checkbox) => sum + (checkbox.checked ? Number(checkbox.dataset.c) : 0), 0);
+      const yearly = document.getElementById("yr");
+      if (yearly) yearly.textContent = "$" + (total * 12).toFixed(2);
+    };
+    checkboxes.forEach((checkbox) => checkbox.addEventListener("change", updateYearlySavings));
+    updateYearlySavings();
 
-  // -------------------------------------------------------------
-  // SECTION 2: Client Vector DB Similarity Distance Demo
-  // -------------------------------------------------------------
-  const [ragQueryIndex, setRagQueryIndex] = useState(0);
-  const ragQueries = [
-    {
-      query: "Can I buy the $180 espresso machine?",
-      closestMatch: "MEMORY.md: Rule #2 - Non-essential purchases over $50 require discretionary cushion check.",
-      cosine: 0.942,
-      latency: "8.4 ms",
-      vectorSpace: [
-        { label: "Dining / Kitchen Envelope", score: 0.942, match: true },
-        { label: "Recent Checking Inflows", score: 0.812, match: false },
-        { label: "Emergency Reserve Floor", score: 0.765, match: false },
-        { label: "Unrelated Travel Bills", score: 0.312, match: false }
-      ]
-    },
-    {
-      query: "How much did I spend on groceries this month?",
-      closestMatch: "Ledger Store: 4 transactions categorized under Groceries (Total $312.40).",
-      cosine: 0.978,
-      latency: "6.1 ms",
-      vectorSpace: [
-        { label: "Groceries Envelope ($500 quota)", score: 0.978, match: true },
-        { label: "Trader Joe's ($42.50)", score: 0.915, match: false },
-        { label: "Whole Foods Market ($89.20)", score: 0.884, match: false },
-        { label: "Electric Bill Utility", score: 0.221, match: false }
-      ]
-    },
-    {
-      query: "Is my rent autopay scheduled?",
-      closestMatch: "Obligations Matrix: Rent ($1,400.00) due on 1st. Autopay active via Chase Operating.",
-      cosine: 0.963,
-      latency: "7.2 ms",
-      vectorSpace: [
-        { label: "Recurring Obligation: Rent", score: 0.963, match: true },
-        { label: "Apartment Utilities", score: 0.841, match: false },
-        { label: "Bank Account Floors", score: 0.729, match: false },
-        { label: "Discretionary Dining", score: 0.185, match: false }
-      ]
-    }
-  ];
+    let balance = 640;
+    let stage = "Staged";
+    const buttons = document.getElementById("btns");
+    const renderActions = () => {
+      if (!buttons) return;
+      buttons.innerHTML = "";
+      ["Staged", "Applied", "Reverted"].forEach((name) => {
+        const element = document.getElementById("s-" + name);
+        if (element) element.className = name === stage ? "on" : "";
+      });
+      const balanceElement = document.getElementById("bal");
+      if (balanceElement) balanceElement.textContent = "$" + balance.toFixed(2);
+      const status = document.getElementById("st");
+      const messages: Record<string, string> = {
+        Staged: "Waiting for you",
+        Applied: "Applied",
+        Reverted: "Reverted, balance restored",
+        Rejected: "Rejected, nothing changed"
+      };
+      if (status) status.textContent = messages[stage] || stage;
 
-  // -------------------------------------------------------------
-  // SECTION 3: Dynamic Envelope Simulation
-  // -------------------------------------------------------------
-  const [checkingBalance, setCheckingBalance] = useState(3800);
-  const [pendingBills, setPendingBills] = useState(1350);
-  const safetyFloor = 1000;
-  const daysRemaining = 18;
+      const addButton = (label: string, action: () => void, ghost = false) => {
+        const button = document.createElement("button");
+        button.className = "btn" + (ghost ? " ghost" : "");
+        button.textContent = label;
+        button.type = "button";
+        button.addEventListener("click", action);
+        buttons.appendChild(button);
+      };
 
-  const availableCushion = Math.max(0, checkingBalance - safetyFloor - pendingBills);
-  const safeDailySpend = (availableCushion / daysRemaining).toFixed(2);
+      if (stage === "Staged") {
+        addButton("Confirm", () => { stage = "Applied"; balance = 622; renderActions(); });
+        addButton("Reject", () => { stage = "Rejected"; renderActions(); }, true);
+      } else if (stage === "Applied") {
+        addButton("Revert", () => { stage = "Reverted"; balance = 640; renderActions(); }, true);
+      } else {
+        addButton("Try again", () => { stage = "Staged"; balance = 640; renderActions(); }, true);
+      }
+    };
+    renderActions();
 
-  // -------------------------------------------------------------
-  // SECTION 5: Two-Phase Rollback State Machine Demo
-  // -------------------------------------------------------------
-  const [rollbackStage, setRollbackStage] = useState<'idle' | 'staged' | 'committed' | 'reverted'>('idle');
-  const [simBalance, setSimBalance] = useState(3800);
-
-  const handleStageDemo = () => {
-    setRollbackStage('staged');
-  };
-
-  const handleCommitDemo = () => {
-    setRollbackStage('committed');
-    setSimBalance(prev => prev - 85.00);
-  };
-
-  const handleRevertDemo = () => {
-    setRollbackStage('reverted');
-    setSimBalance(prev => prev + 85.00);
-  };
-
-  const handleResetDemo = () => {
-    setRollbackStage('idle');
-    setSimBalance(3800);
-  };
+    return () => {
+      // The page is removed on unmount, so DOM-bound listeners are discarded with it.
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FB] dark:bg-[#0A0910] text-[#18181B] dark:text-[#F4F4F5] flex flex-col font-sans transition-colors duration-200">
-      
-      {/* =========================================================
-          HERO SECTION (Clean Corporate SaaS Layout, No 3D Window)
-         ========================================================= */}
-      <section className="relative pt-14 pb-16 sm:pt-20 sm:pb-24 border-b border-zinc-200/80 dark:border-zinc-800/80 overflow-hidden bg-gradient-to-b from-white to-[#F8F9FB] dark:from-[#0f0e17] dark:to-[#0A0910]">
+    <div className="purse-landing">
+      <style>{`
         
-        {/* Subtle Background Glow Grid */}
-        <div className="absolute inset-0 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#1f1e29_1px,transparent_1px)] [background-size:24px_24px] opacity-60 pointer-events-none" />
-
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-12">
-          
-          <div className="text-center max-w-4xl mx-auto space-y-6">
-            
-            {/* Architectural Eyebrow Pill */}
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium border border-violet-200 dark:border-violet-800/80 bg-violet-50/80 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
-              <span>PURSE · AUTONOMOUS PRIVATE AGENT COGNITION</span>
-              <span className="text-zinc-300 dark:text-zinc-700">|</span>
-              <span className="text-zinc-500 dark:text-zinc-400">EDGE NATIVE · ZERO CLOUD TELEMETRY</span>
-            </div>
-
-            {/* Main Headline */}
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-[1.06] text-balance">
-              Autonomous Personal Finance. <br className="hidden sm:inline" />
-              <span className="bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                Private In Your Browser.
-              </span>
-            </h1>
-
-            {/* Sub-headline */}
-            <p className="text-base sm:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-              Purse pairs deterministic ledger mathematics with client-side vector memory and LLM reasoning. Conversational bookkeeping, live bill radars, and safe execution gates with single-click rollback.
-            </p>
-
-            {/* Action Row: Launch App + Install PWA */}
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <button
-                onClick={() => setCurrentView('chat')}
-                className="flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 transition-all cursor-pointer shadow-lg shadow-violet-500/25 active:scale-95"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Launch Purse App</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-
-              {!isInstalled && (
-                <button
-                  onClick={handleInstallClick}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-xl text-sm font-mono font-semibold border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] text-zinc-800 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-850 transition-all cursor-pointer shadow-xs active:scale-95"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Install PWA</span>
-                </button>
-              )}
-            </div>
-
-            {/* Trust Metrics Pill Bar */}
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-5 sm:gap-8 text-xs font-mono text-zinc-500 dark:text-zinc-400">
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                100% Client-Side Privacy
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                Zero Cloud Data Brokers
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                1-Click Rollback State Machine
-              </span>
-              <span className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                Sub-15ms In-Browser RAG
-              </span>
-            </div>
-
-          </div>
-
-          {/* Interactive Live Intent Reasoning Engine Preview */}
-          <div className="pt-4 max-w-4xl mx-auto">
-            <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-2xl overflow-hidden text-left">
-              
-              {/* Simulator Header */}
-              <div className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/80 dark:bg-zinc-900/80 font-mono text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 ml-2">
-                    Cognitive Intent & Execution Gate Simulator
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                  <span className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
-                  <span>Interactive Engine Demo</span>
-                </div>
-              </div>
-
-              {/* Input Area */}
-              <div className="p-5 sm:p-6 space-y-3.5">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={simPrompt}
-                    onChange={e => setSimPrompt(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && runSimulation(simPrompt)}
-                    placeholder="Enter transaction: e.g. 'Gained $1,200 freelance deposit' or 'Spent $42.50 at Trader Joe\'s'"
-                    className="flex-1 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 px-4 py-3 rounded-xl text-xs sm:text-sm font-mono text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:border-violet-500"
-                  />
-                  <button
-                    onClick={() => runSimulation(simPrompt)}
-                    disabled={simState === 'thinking' || simState === 'streaming'}
-                    className="px-5 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-xs font-mono font-semibold transition-all cursor-pointer shrink-0 shadow-xs active:scale-95 flex items-center gap-1.5"
-                  >
-                    {simState === 'thinking' ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Reasoning...</span>
-                      </>
-                    ) : (
-                      <span>Simulate Intent</span>
-                    )}
-                  </button>
-                </div>
-
-                {/* Sample Prompt Pills */}
-                <div className="flex flex-wrap gap-2">
-                  {samplePrompts.map(p => (
-                    <button
-                      key={p}
-                      onClick={() => runSimulation(p)}
-                      disabled={simState === 'thinking' || simState === 'streaming'}
-                      className="text-[11px] font-mono px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-750 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-750 transition-colors cursor-pointer font-medium disabled:opacity-50"
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Simulated Thinking Trace */}
-              {simState === 'thinking' && (
-                <div className="px-5 sm:px-6 pb-6 pt-2 font-mono text-xs border-t border-zinc-200 dark:border-zinc-800 space-y-2.5">
-                  <div className="flex items-center gap-2 text-violet-600 dark:text-violet-400 font-bold text-[11px]">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>COGNITIVE THOUGHT TRACE (SIMULATED THINKING):</span>
-                  </div>
-
-                  <div className="space-y-1.5 text-zinc-600 dark:text-zinc-400 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-emerald-500 font-bold">✓</span>
-                      <span>[Step 1/3] Parsing linguistic entities and detecting transaction polarity...</span>
-                    </div>
-
-                    {thinkingStep >= 2 && (
-                      <div className="flex items-center gap-2 animate-in fade-in duration-150">
-                        <span className="text-emerald-500 font-bold">✓</span>
-                        <span>[Step 2/3] Querying client-side Vector Database via Cosine RAG...</span>
-                      </div>
-                    )}
-
-                    {thinkingStep >= 3 && (
-                      <div className="flex items-center gap-2 animate-in fade-in duration-150">
-                        <span className="text-emerald-500 font-bold">✓</span>
-                        <span>[Step 3/3] Validating checking floor invariant ($1,000 baseline) and budget envelope...</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Text Streaming Output */}
-              {(simState === 'streaming' || simState === 'complete') && simResultData && (
-                <div className="px-5 sm:px-6 pb-6 pt-3 font-mono text-xs border-t border-zinc-200 dark:border-zinc-800 space-y-3">
-                  <div className="flex items-center justify-between text-zinc-500 dark:text-zinc-400 text-[11px] font-bold">
-                    <span>RECOGNIZED AGENT INTENT:</span>
-                    <span className="font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/60 px-2.5 py-0.5 rounded-full border border-violet-200 dark:border-violet-800">
-                      {simResultData.intent}
-                    </span>
-                  </div>
-
-                  {/* Character/Word Streamed AI Response */}
-                  <div className="p-3.5 bg-zinc-50 dark:bg-zinc-900/60 rounded-xl border border-zinc-200/80 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 font-sans text-xs sm:text-sm leading-relaxed">
-                    {streamedText}
-                    {simState === 'streaming' && (
-                      <span className="inline-block w-1.5 h-3.5 bg-violet-600 ml-1 animate-pulse align-middle" />
-                    )}
-                  </div>
-
-                  {/* Staged Execution Gate Card */}
-                  <div className="p-3 rounded-xl bg-violet-50 dark:bg-violet-950/40 border border-violet-200 dark:border-violet-800 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px]">
-                    <div className="flex items-center gap-2 text-violet-900 dark:text-violet-200">
-                      <Shield className="w-3.5 h-3.5 text-violet-600 shrink-0" />
-                      <span><strong>STAGED SAFE ACTION:</strong> {simResultData.actionDetail}</span>
-                    </div>
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">
-                      {simResultData.impact}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          FEATURE SECTION 1: Natural Language Lexical Extraction Pipeline
-         ========================================================= */}
-      <section className="py-20 sm:py-28 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0b12]">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            
-            {/* Left: Detailed Explanations */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/50 border border-violet-200 dark:border-violet-800">
-                <Terminal className="w-3.5 h-3.5" />
-                <span>SUBSYSTEM 01 · COGNITIVE PARSER</span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Linguistic Entity Extraction & Deterministic Parsing
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
-                Human finance is messy: unstructured receipts, informal chat messages, and irregular deposits. Purse uses a multi-stage parser that extracts transaction polarity (credit vs debit), merchant entity tokens, temporal markers, and amount bounds in sub-12 milliseconds.
-              </p>
-              
-              <ul className="space-y-3 font-mono text-xs text-zinc-600 dark:text-zinc-400 pt-2">
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span><strong>Zero-Friction Bookkeeping:</strong> Type or speak naturally without navigating manual entry modals.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span><strong>Dual-Tier Fallback:</strong> Local edge regex heuristic validates syntax before invoking server Gemini models.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                  <span><strong>Confidence Threshold:</strong> Transactions below 95% certainty are highlighted for user review.</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Right: Unique Animated Pipeline Diagram & Interactive Token Viewer */}
-            <div className="lg:col-span-7">
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-[#F8F9FB] dark:bg-[#121216] shadow-xl overflow-hidden p-6 space-y-6">
-                
-                {/* Pipeline Top Status */}
-                <div className="flex items-center justify-between pb-4 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="font-bold text-zinc-800 dark:text-zinc-200">Entity Extraction Logic Stream</span>
-                  </div>
-                  <div className="text-zinc-400 text-[11px]">Pipeline Latency: ~11.8ms</div>
-                </div>
-
-                {/* Animated Pipeline Nodes */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center font-mono text-[11px]">
-                  <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-violet-200 dark:border-violet-800 shadow-xs">
-                    <div className="text-violet-600 dark:text-violet-400 font-bold">1. Lexical Token</div>
-                    <div className="text-zinc-500 text-[10px] mt-1">Tokenizer & Regex</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-violet-200 dark:border-violet-800 shadow-xs">
-                    <div className="text-violet-600 dark:text-violet-400 font-bold">2. Polarity Gate</div>
-                    <div className="text-zinc-500 text-[10px] mt-1">Debit / Credit Flag</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-violet-200 dark:border-violet-800 shadow-xs">
-                    <div className="text-violet-600 dark:text-violet-400 font-bold">3. Envelope Route</div>
-                    <div className="text-zinc-500 text-[10px] mt-1">Category Classifier</div>
-                  </div>
-                  <div className="p-3 rounded-xl bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-700 bg-emerald-50/40 dark:bg-emerald-950/20 shadow-xs">
-                    <div className="text-emerald-600 dark:text-emerald-400 font-bold">4. Action Stage</div>
-                    <div className="text-zinc-500 text-[10px] mt-1">Verified Payload</div>
-                  </div>
-                </div>
-
-                {/* Interactive Example Selector */}
-                <div className="space-y-3">
-                  <div className="text-xs font-mono font-semibold text-zinc-500 dark:text-zinc-400">
-                    CLICK TO TEST INGESTION SAMPLE:
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {pipelineExamples.map((ex, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setPipelineSample(idx)}
-                        className={`text-xs font-mono px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                          pipelineSample === idx
-                            ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
-                            : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-violet-400'
-                        }`}
-                      >
-                        Sample #{idx + 1}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Extracted Entity Data Visualizer */}
-                <div className="p-4 rounded-xl bg-white dark:bg-zinc-900/90 border border-zinc-200 dark:border-zinc-800 space-y-3 font-mono text-xs">
-                  <div className="text-zinc-500 text-[11px]">
-                    RAW INPUT: <span className="text-zinc-900 dark:text-zinc-100 font-sans font-semibold">&ldquo;{pipelineExamples[pipelineSample].input}&rdquo;</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                    <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                      <div className="text-[10px] text-zinc-400">INTENT POLARITY</div>
-                      <div className={`font-bold mt-0.5 ${pipelineExamples[pipelineSample].type === 'INCOME' ? 'text-emerald-600' : 'text-violet-600'}`}>
-                        {pipelineExamples[pipelineSample].type}
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                      <div className="text-[10px] text-zinc-400">EXTRACTED AMOUNT</div>
-                      <div className="font-bold text-zinc-900 dark:text-zinc-100 mt-0.5">
-                        {pipelineExamples[pipelineSample].amount}
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                      <div className="text-[10px] text-zinc-400">IDENTIFIED ENTITY</div>
-                      <div className="font-bold text-zinc-900 dark:text-zinc-100 mt-0.5 truncate">
-                        {pipelineExamples[pipelineSample].merchant}
-                      </div>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-100 dark:border-zinc-800">
-                      <div className="text-[10px] text-zinc-400">CONFIDENCE SCORE</div>
-                      <div className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                        {pipelineExamples[pipelineSample].confidence}%
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-between text-[11px] text-emerald-800 dark:text-emerald-300">
-                    <span className="flex items-center gap-1.5 font-bold">
-                      <Shield className="w-3.5 h-3.5" />
-                      INVARIANT SAFETY VERIFICATION:
-                    </span>
-                    <span>{pipelineExamples[pipelineSample].invariantCheck}</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          FEATURE SECTION 2: Client Vector DB & Cosine RAG Engine
-         ========================================================= */}
-      <section className="py-20 sm:py-28 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-[#F8F9FB] dark:bg-[#0A0910]">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            
-            {/* Left: Vector Radar & Visual Distance Graph */}
-            <div className="lg:col-span-7 order-2 lg:order-1">
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xl overflow-hidden p-6 space-y-5">
-                
-                {/* RAG Query Controls */}
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                    <Database className="w-4 h-4 text-violet-600" />
-                    In-Browser Vector Embeddings Matrix
-                  </span>
-                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-                    100% In-Memory Sandbox
-                  </span>
-                </div>
-
-                {/* Prompt Queries */}
-                <div className="flex flex-wrap gap-2">
-                  {ragQueries.map((q, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setRagQueryIndex(idx)}
-                      className={`text-xs font-mono px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                        ragQueryIndex === idx
-                          ? 'bg-violet-600 text-white border-violet-600 shadow-xs'
-                          : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:border-violet-400'
-                      }`}
-                    >
-                      Query #{idx + 1}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Active Query Display */}
-                <div className="p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800/60 font-mono text-xs space-y-1">
-                  <div className="text-[10px] text-violet-700 dark:text-violet-300 font-bold uppercase">
-                    Client Natural Query
-                  </div>
-                  <div className="text-zinc-900 dark:text-zinc-100 font-semibold font-sans">
-                    &ldquo;{ragQueries[ragQueryIndex].query}&rdquo;
-                  </div>
-                </div>
-
-                {/* Cosine Similarity Visual Bars */}
-                <div className="space-y-2.5 font-mono text-xs">
-                  <div className="flex justify-between text-[11px] text-zinc-400">
-                    <span>EMBEDDING SPACE CLUSTERS</span>
-                    <span>COSINE SIMILARITY METRIC</span>
-                  </div>
-
-                  {ragQueries[ragQueryIndex].vectorSpace.map((cluster, i) => (
-                    <div
-                      key={i}
-                      className={`p-2.5 rounded-xl border transition-all ${
-                        cluster.match
-                          ? 'bg-violet-50 dark:bg-violet-950/40 border-violet-300 dark:border-violet-700'
-                          : 'bg-zinc-50/60 dark:bg-zinc-900/40 border-zinc-200/80 dark:border-zinc-800/80'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center text-xs mb-1.5">
-                        <span className={cluster.match ? 'font-bold text-violet-900 dark:text-violet-200' : 'text-zinc-600 dark:text-zinc-400'}>
-                          {cluster.label}
-                        </span>
-                        <span className="font-bold text-violet-600 dark:text-violet-400">
-                          {cluster.score.toFixed(3)}
-                        </span>
-                      </div>
-                      <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            cluster.match ? 'bg-violet-600' : 'bg-zinc-400 dark:bg-zinc-600'
-                          }`}
-                          style={{ width: `${cluster.score * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Top Semantic Match Result */}
-                <div className="p-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-1 font-mono text-xs">
-                  <div className="flex justify-between items-center text-[10px] text-zinc-400">
-                    <span>TOP RETRIEVED CHUNK (INJECTED TO PROMPT)</span>
-                    <span className="text-emerald-500 font-bold">Latency: {ragQueries[ragQueryIndex].latency}</span>
-                  </div>
-                  <div className="text-zinc-800 dark:text-zinc-200 font-sans text-xs leading-relaxed">
-                    {ragQueries[ragQueryIndex].closestMatch}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Right: Architectural Text */}
-            <div className="lg:col-span-5 order-1 lg:order-2 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800">
-                <Database className="w-3.5 h-3.5" />
-                <span>SUBSYSTEM 02 · ZERO-CLOUD RAG</span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                In-Memory Vector Search With Total Client Isolation
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
-                Traditional RAG architectures transmit your private account balances, spending habits, and vendor histories to hosted vector cloud clusters (like Pinecone or Qdrant). Purse computes dense semantic embeddings entirely inside your web browser using a zero-dependency in-memory cosine index.
-              </p>
-              
-              <ul className="space-y-3 font-mono text-xs text-zinc-600 dark:text-zinc-400 pt-2">
-                <li className="flex items-start gap-2.5">
-                  <Lock className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                  <span><strong>Zero Network Egress:</strong> Your financial knowledge graph never traverses external networks for vector storage.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <Zap className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                  <span><strong>Sub-10ms Exact Search:</strong> Cosine similarity dot-products run synchronously without network roundtrips.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <FileText className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
-                  <span><strong>Markdown Grounding:</strong> Vector chunks map directly to lines in your editable <code>MEMORY.md</code> graph.</span>
-                </li>
-              </ul>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          FEATURE SECTION 3: Dynamic Envelope Budgeting & Safe-Daily-Spend
-         ========================================================= */}
-      <section className="py-20 sm:py-28 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0b12]">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            
-            {/* Left: Explanations */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800">
-                <Sliders className="w-3.5 h-3.5" />
-                <span>SUBSYSTEM 03 · DYNAMIC ENVELOPES</span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Algorithmic Safe-to-Spend & Envelope Headroom
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
-                Static budgeting breaks the moment unexpected expenses arise. Purse continuously calculates your liquid safety buffer: subtracting mandatory 30-day bills and your immutable checking safety floor from current deposits, giving you an exact, risk-free daily discretionary limit.
-              </p>
-              
-              {/* Math Formulation Callout */}
-              <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 font-mono text-xs space-y-2 text-zinc-700 dark:text-zinc-300">
-                <div className="text-[10px] text-zinc-400 uppercase font-bold">Mathematical Formulation:</div>
-                <div className="text-violet-600 dark:text-violet-400 font-bold text-[13px]">
-                  Cushion = max(0, Balance - Floor - CommittedBills)
-                </div>
-                <div className="text-emerald-600 dark:text-emerald-400 font-bold text-[13px]">
-                  Safe Daily Spend = Cushion / DaysRemaining
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Interactive Live Slider & Visual Gauge */}
-            <div className="lg:col-span-7">
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-[#F8F9FB] dark:bg-[#121216] shadow-xl overflow-hidden p-6 space-y-6">
-                
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-500" />
-                    Interactive Liquidity & Daily Cap Modeler
-                  </span>
-                  <span className="text-[11px] text-zinc-400">Live Feedback Loop</span>
-                </div>
-
-                {/* Interactive Sliders */}
-                <div className="space-y-4 font-mono text-xs">
-                  
-                  {/* Slider 1: Checking Balance */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-600 dark:text-zinc-400">Operating Checking Balance:</span>
-                      <span className="font-bold text-zinc-900 dark:text-zinc-100">${checkingBalance.toLocaleString()}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={2000}
-                      max={8000}
-                      step={100}
-                      value={checkingBalance}
-                      onChange={e => setCheckingBalance(Number(e.target.value))}
-                      className="w-full accent-violet-600 cursor-pointer"
-                    />
-                  </div>
-
-                  {/* Slider 2: Pending Bills */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-zinc-600 dark:text-zinc-400">Committed 30-Day Bills:</span>
-                      <span className="font-bold text-zinc-900 dark:text-zinc-100">${pendingBills.toLocaleString()}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={500}
-                      max={3000}
-                      step={50}
-                      value={pendingBills}
-                      onChange={e => setPendingBills(Number(e.target.value))}
-                      className="w-full accent-violet-600 cursor-pointer"
-                    />
-                  </div>
-
-                </div>
-
-                {/* Real-Time Computed Metrics Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs pt-1">
-                  
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div className="text-[10px] text-zinc-400">SAFETY FLOOR</div>
-                    <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 mt-1">${safetyFloor}</div>
-                    <div className="text-[10px] text-emerald-500 mt-0.5">Strict Baseline</div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
-                    <div className="text-[10px] text-zinc-400">AVAILABLE CUSHION</div>
-                    <div className="text-base font-bold text-violet-600 dark:text-violet-400 mt-1">
-                      ${availableCushion.toLocaleString()}
-                    </div>
-                    <div className="text-[10px] text-zinc-400 mt-0.5">Risk-Free Capital</div>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700">
-                    <div className="text-[10px] text-emerald-800 dark:text-emerald-300 font-bold">SAFE DAILY SPEND</div>
-                    <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
-                      ${safeDailySpend} <span className="text-xs font-normal">/ day</span>
-                    </div>
-                    <div className="text-[10px] text-emerald-700 dark:text-emerald-300 mt-0.5">Over {daysRemaining} days</div>
-                  </div>
-
-                </div>
-
-                {/* Dynamic Envelope Categories Breakdown */}
-                <div className="space-y-2.5 font-mono text-xs pt-2">
-                  <div className="text-[11px] text-zinc-500">DYNAMIC ENVELOPE HEADROOM ALLOCATION:</div>
-                  
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span>Groceries & Restocking</span>
-                      <span className="font-bold text-emerald-600">$188.00 / $500.00 left</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-emerald-500 h-full rounded-full" style={{ width: '62%' }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span>Dining & Leisure Wants</span>
-                      <span className="font-bold text-amber-500">$95.00 / $300.00 left</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: '68%' }} />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[11px]">
-                      <span>Software & Media Subscriptions</span>
-                      <span className="font-bold text-violet-500">$79.00 / $120.00 left</span>
-                    </div>
-                    <div className="w-full bg-zinc-200 dark:bg-zinc-800 h-2 rounded-full overflow-hidden">
-                      <div className="bg-violet-500 h-full rounded-full" style={{ width: '65%' }} />
-                    </div>
-                  </div>
-
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          FEATURE SECTION 4: Temporal Obligations Radar & Predictive Cash-Flow
-         ========================================================= */}
-      <section className="py-20 sm:py-28 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-[#F8F9FB] dark:bg-[#0A0910]">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            
-            {/* Left: SVG Cashflow Graph & Leak Matrix */}
-            <div className="lg:col-span-7 order-2 lg:order-1">
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121216] shadow-xl overflow-hidden p-6 space-y-5">
-                
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-amber-500" />
-                    30-Day Liquidity Trajectory & Invariant Bounds
-                  </span>
-                  <span className="text-[11px] text-zinc-400">Forward Projection</span>
-                </div>
-
-                {/* SVG Visual Graph: Cash Balance over 30 Days */}
-                <div className="w-full bg-zinc-50 dark:bg-zinc-900/80 rounded-xl p-4 border border-zinc-200 dark:border-zinc-800">
-                  <div className="text-[10px] font-mono text-zinc-400 mb-2 flex justify-between">
-                    <span>LIQUID BALANCE PROJECTION CURVE ($)</span>
-                    <span className="text-emerald-500">Checking Floor: $1,000</span>
-                  </div>
-
-                  {/* SVG Chart */}
-                  <div className="relative w-full h-36">
-                    <svg className="w-full h-full" viewBox="0 0 500 120" preserveAspectRatio="none">
-                      {/* Grid Lines */}
-                      <line x1="0" y1="30" x2="500" y2="30" stroke="currentColor" strokeDasharray="3 3" className="text-zinc-200 dark:text-zinc-800" />
-                      <line x1="0" y1="70" x2="500" y2="70" stroke="currentColor" strokeDasharray="3 3" className="text-zinc-200 dark:text-zinc-800" />
-                      <line x1="0" y1="100" x2="500" y2="100" stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="4 2" />
-
-                      {/* Cashflow Trajectory Path */}
-                      <path
-                        d="M 0,25 Q 80,30 140,55 T 220,70 T 320,35 T 420,60 T 500,45"
-                        fill="none"
-                        stroke="#8b5cf6"
-                        strokeWidth="3"
-                      />
-
-                      {/* Gradient Fill under Path */}
-                      <path
-                        d="M 0,25 Q 80,30 140,55 T 220,70 T 320,35 T 420,60 T 500,45 L 500,120 L 0,120 Z"
-                        fill="url(#violetGradient)"
-                        opacity="0.15"
-                      />
-
-                      {/* Payday Cliff Marker */}
-                      <circle cx="320" cy="35" r="4" fill="#10b981" />
-                      {/* Rent Deduction Marker */}
-                      <circle cx="140" cy="55" r="4" fill="#f59e0b" />
-
-                      <defs>
-                        <linearGradient id="violetGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#8b5cf6" />
-                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                    </svg>
-                  </div>
-
-                  <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-                    <span>Day 1 (Today)</span>
-                    <span className="text-amber-500 font-bold">• Day 10: Rent ($1,400)</span>
-                    <span className="text-emerald-500 font-bold">• Day 15: Payday (+$2,850)</span>
-                    <span>Day 30</span>
-                  </div>
-                </div>
-
-                {/* Subscription Leak Detection Radar Card */}
-                <div className="p-4 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 font-mono text-xs space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                      <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                      AUTONOMOUS LEAK AUDIT DETECTED:
-                    </span>
-                    <span className="text-[10px] bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 px-2 py-0.5 rounded-full font-bold">
-                      Recovery: $659.88/yr
-                    </span>
-                  </div>
-
-                  <div className="text-zinc-700 dark:text-zinc-300 text-xs font-sans">
-                    Flagged <strong>Adobe Creative Cloud ($54.99/mo)</strong>: Zero operational receipts or login tokens logged in 42 days. Redundant with Affinity suite license.
-                  </div>
-
-                  <div className="pt-1 flex items-center justify-between text-[11px] text-amber-800 dark:text-amber-300 border-t border-amber-200/60 dark:border-amber-800/40">
-                    <span>Status: Staged cancellation review in Cockpit</span>
-                    <span className="font-bold">Zero Lifestyle Impact</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Right: Architectural Text */}
-            <div className="lg:col-span-5 order-1 lg:order-2 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800">
-                <Clock className="w-3.5 h-3.5" />
-                <span>SUBSYSTEM 04 · TEMPORAL RADAR</span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Predictive Cashflow Timelines & Subscription Leak Auditing
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
-                Bills don&apos;t arrive uniformly. Clustered rent payments and auto-renewing software fees cause liquidity crises even when a monthly budget looks healthy on paper. Purse models exact timing curves, testing whether committed deductions breach your safety floor before your next confirmed deposit.
-              </p>
-              
-              <ul className="space-y-3 font-mono text-xs text-zinc-600 dark:text-zinc-400 pt-2">
-                <li className="flex items-start gap-2.5">
-                  <Calendar className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <span><strong>Second-by-Second Due Radar:</strong> Dynamic countdown clocks for impending rent, utilities, and debt payments.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <span><strong>Zero-Friction Leak Discovery:</strong> Detects overlapping streaming services and abandoned monthly licenses.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <TrendingUp className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                  <span><strong>Survival Runway Simulation:</strong> Real-time zero-income runway projection based on non-discretionary commitments.</span>
-                </li>
-              </ul>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          FEATURE SECTION 5: Two-Phase Rollback State Machine & Continuous Memory
-         ========================================================= */}
-      <section className="py-20 sm:py-28 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-[#0c0b12]">
-        <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            
-            {/* Left: Explanations */}
-            <div className="lg:col-span-5 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800">
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>SUBSYSTEM 05 · EXECUTION GATE</span>
-              </div>
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-                Two-Phase Rollback Protocol & Markdown Knowledge Graph
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans">
-                Autonomous agents must never perform unmonitored silent mutations on financial records. Every transaction, budget update, or memory alteration adheres to a strict two-phase commit protocol: staged with impact previews and backed by mathematical single-click rollback.
-              </p>
-              
-              <ul className="space-y-3 font-mono text-xs text-zinc-600 dark:text-zinc-400 pt-2">
-                <li className="flex items-start gap-2.5">
-                  <Shield className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span><strong>Human-in-the-Loop Gate:</strong> Explicit confirmation before any ledger entry or bank balance mutation is sealed.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <RotateCcw className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span><strong>1-Click Instant Rollback:</strong> Inverse delta transforms return account balances to their exact prior states.</span>
-                </li>
-                <li className="flex items-start gap-2.5">
-                  <FileText className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <span><strong>Human-Auditable Memory:</strong> Preferences and rules persist in an inspectable Markdown file (<code>MEMORY.md</code>).</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Right: Interactive State Machine Visualizer */}
-            <div className="lg:col-span-7">
-              <div className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-[#F8F9FB] dark:bg-[#121216] shadow-xl overflow-hidden p-6 space-y-6">
-                
-                <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800 font-mono text-xs">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-2">
-                    <GitBranch className="w-4 h-4 text-rose-500" />
-                    Two-Phase State Machine Simulation
-                  </span>
-                  <span className="text-[11px] text-zinc-400">Deterministic Invariants</span>
-                </div>
-
-                {/* State Node Graph */}
-                <div className="grid grid-cols-4 gap-2 text-center font-mono text-[11px]">
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    rollbackStage === 'idle'
-                      ? 'bg-violet-600 text-white border-violet-600 font-bold shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'
-                  }`}>
-                    <div>S0: IDLE</div>
-                    <div className="text-[9px] mt-0.5">Ready</div>
-                  </div>
-
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    rollbackStage === 'staged'
-                      ? 'bg-amber-500 text-white border-amber-500 font-bold shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'
-                  }`}>
-                    <div>S1: STAGED</div>
-                    <div className="text-[9px] mt-0.5">Preview Gate</div>
-                  </div>
-
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    rollbackStage === 'committed'
-                      ? 'bg-emerald-600 text-white border-emerald-600 font-bold shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'
-                  }`}>
-                    <div>S2: COMMITTED</div>
-                    <div className="text-[9px] mt-0.5">Mutated</div>
-                  </div>
-
-                  <div className={`p-2.5 rounded-xl border transition-all ${
-                    rollbackStage === 'reverted'
-                      ? 'bg-rose-600 text-white border-rose-600 font-bold shadow-xs'
-                      : 'bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800'
-                  }`}>
-                    <div>S3: REVERTED</div>
-                    <div className="text-[9px] mt-0.5">Restored</div>
-                  </div>
-                </div>
-
-                {/* Interactive Simulated Balance & Staged Action */}
-                <div className="p-4 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-3 font-mono text-xs">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-zinc-500">SIMULATED CHECKING BALANCE:</span>
-                    <span className="text-base font-bold text-zinc-900 dark:text-zinc-100">${simBalance.toFixed(2)}</span>
-                  </div>
-
-                  {rollbackStage === 'idle' && (
-                    <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
-                      No active staged mutations. Click below to simulate the agent staging a new $85.00 transaction.
-                    </div>
-                  )}
-
-                  {rollbackStage === 'staged' && (
-                    <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 space-y-1">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        STAGED TRANSACTION: -$85.00 at Apple Store
-                      </div>
-                      <div className="text-[11px]">Ledger status: PENDING. Balance has NOT yet been changed.</div>
-                    </div>
-                  )}
-
-                  {rollbackStage === 'committed' && (
-                    <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 space-y-1">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <CheckCheck className="w-3.5 h-3.5" />
-                        TRANSACTION APPLIED: -$85.00 debited from Checking
-                      </div>
-                      <div className="text-[11px]">Undo checkpoint registered in recovery stack.</div>
-                    </div>
-                  )}
-
-                  {rollbackStage === 'reverted' && (
-                    <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-700 text-rose-900 dark:text-rose-200 space-y-1">
-                      <div className="font-bold flex items-center gap-1.5">
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        ACTION REVERTED: +$85.00 restored to Checking
-                      </div>
-                      <div className="text-[11px]">Balance perfectly restored to initial $3,800.00 baseline.</div>
-                    </div>
-                  )}
-
-                  {/* Action Trigger Buttons */}
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {rollbackStage === 'idle' && (
-                      <button
-                        onClick={handleStageDemo}
-                        className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs flex items-center gap-1.5"
-                      >
-                        <Play className="w-3.5 h-3.5" />
-                        Stage New Transaction (-$85.00)
-                      </button>
-                    )}
-
-                    {rollbackStage === 'staged' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleCommitDemo}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs flex items-center gap-1.5"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          Confirm & Commit
-                        </button>
-                        <button
-                          onClick={handleResetDemo}
-                          className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all"
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    )}
-
-                    {rollbackStage === 'committed' && (
-                      <button
-                        onClick={handleRevertDemo}
-                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all shadow-xs flex items-center gap-1.5"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        1-Click Instant Rollback
-                      </button>
-                    )}
-
-                    {rollbackStage === 'reverted' && (
-                      <button
-                        onClick={handleResetDemo}
-                        className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl text-xs font-semibold cursor-pointer active:scale-95 transition-all flex items-center gap-1.5"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        Reset Simulation
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Inspectable MEMORY.md Snippet Preview */}
-                <div className="p-3.5 rounded-xl bg-zinc-900 text-zinc-200 font-mono text-[11px] space-y-1.5 border border-zinc-800">
-                  <div className="flex justify-between items-center text-zinc-400 text-[10px] pb-1 border-b border-zinc-800">
-                    <span className="flex items-center gap-1.5">
-                      <FileText className="w-3 h-3 text-violet-400" />
-                      PERSISTENT MEMORY GRAPH · MEMORY.md
-                    </span>
-                    <span className="text-emerald-400">Rev #14 · Client Verified</span>
-                  </div>
-                  <div className="text-zinc-400">## ACTIVE INVARIANTS & PREFERENCES</div>
-                  <div className="text-zinc-300">- RULE_01: Maintain $1,000 checking operating floor.</div>
-                  <div className="text-zinc-300">- RULE_02: Require confirmation for all transactions &gt; $50.</div>
-                  <div className="text-zinc-300">- RULE_03: Restrict Dining envelope spending to $95.00/week.</div>
-                </div>
-
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* =========================================================
-          CORPORATE CALL TO ACTION BANNER
-         ========================================================= */}
-      <section className="py-20 sm:py-24 border-b border-zinc-200/80 dark:border-zinc-800/80 bg-gradient-to-b from-white to-[#F8F9FB] dark:from-[#0c0b12] dark:to-[#0A0910]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-          <div className="p-8 sm:p-14 rounded-3xl bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 text-white shadow-2xl space-y-6 relative overflow-hidden">
-            
-            <div className="space-y-3 relative z-10">
-              <span className="inline-block px-3 py-1 rounded-full text-xs font-mono font-bold bg-white/15 text-violet-100 border border-white/20">
-                100% PRIVATE · CLIENT-SIDE SOVEREIGNTY
-              </span>
-              <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">
-                Experience Autonomous Private Finance.
-              </h2>
-              <p className="text-sm sm:text-base text-violet-100 max-w-xl mx-auto leading-relaxed">
-                No third-party bank screen-scrapers, no remote data leaks. Run your entire financial intelligence engine directly in your browser.
-              </p>
-            </div>
-
-            <div className="pt-2 flex justify-center relative z-10">
-              <button
-                onClick={() => setCurrentView('chat')}
-                className="flex items-center gap-2 px-9 py-4 rounded-xl text-sm font-bold bg-white text-violet-950 hover:bg-violet-50 transition-all shadow-xl cursor-pointer active:scale-95"
-              >
-                <Sparkles className="w-4 h-4 text-violet-600" />
-                <span>Launch Purse App</span>
-                <ArrowRight className="w-4 h-4 text-violet-600" />
-              </button>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          PWA iOS / BROWSER INSTALL MODAL
-         ========================================================= */}
-      {showIOSModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white dark:bg-[#121216] border border-zinc-200 dark:border-zinc-800 w-full max-w-sm p-6 rounded-2xl shadow-2xl space-y-4 font-mono text-xs animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-200 dark:border-zinc-800">
-              <div className="flex items-center gap-2 font-bold text-sm text-zinc-900 dark:text-zinc-100">
-                <Smartphone className="w-4 h-4 text-violet-600" />
-                <span>Install Purse App</span>
-              </div>
-              <button onClick={() => setShowIOSModal(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 cursor-pointer">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-zinc-600 dark:text-zinc-400 font-sans text-xs leading-relaxed">
-              To install Purse on your device for fast access, offline resilience, and an app-like experience:
-            </p>
-
-            <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-xl space-y-2 text-[11px] text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800">
-              <div>1. Tap your browser&apos;s <strong>Share</strong> or <strong>Menu (⋮)</strong> button.</div>
-              <div>2. Scroll down and select <strong>&quot;Add to Home Screen&quot;</strong> or <strong>&quot;Install App&quot;</strong>.</div>
-              <div>3. Launch Purse directly from your phone or desktop home screen!</div>
-            </div>
-
-            <button
-              onClick={() => setShowIOSModal(false)}
-              className="w-full py-2.5 rounded-xl bg-violet-600 text-white hover:bg-violet-700 font-semibold cursor-pointer shadow-xs transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Minimal Footer */}
-      <footer className="py-8 text-center text-xs font-mono text-zinc-400 dark:text-zinc-500 border-t border-zinc-200/60 dark:border-zinc-800/60">
-        Purse Autonomous Finance · Edge-Native AI Personal Finance Engine · 100% Client-Side Sovereignty
-      </footer>
-
+:root{--bg:#F4F1FF;--ink:#1E1538;--mute:#5E557D;--card:#fff;--line:#D9D2F2;--coral:#FF5C7A;--mint:#1FB36F;--sun:#F5B700;--btn:#1E1538;--btnt:#fff;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#150F29;--ink:#F1EDFF;--mute:#A89FCB;--card:#211840;--line:#38295F;--coral:#FF7C94;--mint:#3DDC97;--sun:#FFC93C;--btn:#F1EDFF;--btnt:#150F29}}
+:root[data-theme="dark"]{--bg:#150F29;--ink:#F1EDFF;--mute:#A89FCB;--card:#211840;--line:#38295F;--coral:#FF7C94;--mint:#3DDC97;--sun:#FFC93C;--btn:#F1EDFF;--btnt:#150F29}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 1.0625rem/1.6 Figtree,system-ui,sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque",Figtree,sans-serif;line-height:1.05;margin:0;letter-spacing:-.02em}
+h1{font-size:clamp(2.6rem,7vw,5rem);font-weight:800}
+h2{font-size:clamp(1.9rem,4.5vw,3rem);font-weight:800}
+h3{font-size:1.3rem;font-weight:500;letter-spacing:-.01em}
+p{margin:0}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--coral);outline-offset:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 1.25rem}
+section{padding:5rem 0}
+.lead{color:var(--mute);max-width:56ch;margin-top:1rem}
+nav{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 0}
+.logo{font:800 1.5rem "Bricolage Grotesque",sans-serif;text-decoration:none}
+.btn{display:inline-block;background:var(--btn);color:var(--btnt);border:0;border-radius:999px;padding:.8rem 1.5rem;font:600 1rem Figtree,sans-serif;text-decoration:none;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--ink)}
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:3rem;align-items:center;padding:3rem 0 5rem}
+.hero .cta{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:2rem}
+.calc{background:var(--card);border:2px solid var(--ink);border-radius:28px;padding:1.5rem;box-shadow:8px 8px 0 var(--coral)}
+.calc h3{margin-bottom:1rem}
+.row{display:grid;grid-template-columns:1fr auto;gap:.25rem .5rem;margin-bottom:.9rem;font-size:.95rem}
+.row input{grid-column:1/-1;width:100%;accent-color:var(--coral)}
+.row b{font-variant-numeric:tabular-nums}
+.big{border-top:2px dashed var(--line);padding-top:1rem;margin-top:.5rem}
+.big strong{display:block;font:800 3.4rem/1 "Bricolage Grotesque",sans-serif;color:var(--mint)}
+.big strong.low{color:var(--coral)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
+.chat{background:var(--card);border:1px solid var(--line);border-radius:24px;padding:1.25rem;display:grid;gap:.75rem}
+.me{justify-self:end;background:var(--btn);color:var(--btnt);padding:.6rem 1rem;border-radius:18px 18px 4px 18px;max-width:80%}
+.bot{background:var(--bg);border-radius:18px 18px 18px 4px;padding:.9rem 1rem;font-size:.95rem}
+.chips{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.chips span{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:.15rem .6rem;font-size:.85rem}
+.env{display:grid;gap:1.25rem;margin-top:2.5rem}
+.env .top{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:baseline}
+.env small{color:var(--mute)}
+.bar{height:18px;border-radius:99px;background:var(--line);overflow:hidden;margin:.4rem 0}
+.bar i{display:block;height:100%;border-radius:99px;background:var(--mint)}
+.bar i.warn{background:var(--sun)}
+.pct{font:800 2.6rem/1 "Bricolage Grotesque",sans-serif}
+.list{margin-top:2rem;display:grid;gap:.75rem}
+.sub{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1rem 1.25rem;cursor:pointer}
+.sub input{width:1.3rem;height:1.3rem;accent-color:var(--coral)}
+.sub small{display:block;color:var(--mute)}
+.tag{font-size:.8rem;border-radius:99px;padding:.1rem .6rem;background:var(--sun);color:#1E1538;margin-left:.4rem}
+.total{margin-top:1.5rem;font-size:1.1rem}
+.total b{font:800 2.4rem "Bricolage Grotesque",sans-serif;color:var(--coral)}
+.flow{display:flex;gap:.5rem;flex-wrap:wrap;margin:1.5rem 0}
+.flow span{border:2px solid var(--line);border-radius:99px;padding:.3rem 1rem;font-weight:600;color:var(--mute)}
+.flow span.on{border-color:var(--ink);color:var(--ink);background:var(--card)}
+.act{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:1.25rem}
+.act .btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem}
+.act .btn{padding:.55rem 1.1rem}
+.runway{background:var(--ink);color:var(--bg);border-radius:32px;padding:3rem;display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:center}
+.runway .n{font:800 clamp(4rem,10vw,7rem)/1 "Bricolage Grotesque",sans-serif;color:var(--sun)}
+.runway p{opacity:.85}
+.pts{display:grid;grid-template-columns:repeat(3,1fr);gap:2rem;margin-top:2.5rem}
+.pts h3{margin-bottom:.5rem}
+.pts p{color:var(--mute);font-size:1rem}
+pre{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:1.25rem;overflow-x:auto;font-size:.9rem;margin:1.5rem 0}
+footer{border-top:1px solid var(--line);padding:2rem 0;color:var(--mute);font-size:.9rem}
+@media(max-width:820px){.hero,.two,.runway,.pts{grid-template-columns:1fr}.runway{padding:2rem}section{padding:3.5rem 0}}
+
+        .purse-landing { min-height: 100vh; background: var(--bg); color: var(--ink); }
+      `}</style>
+      <div dangerouslySetInnerHTML={{ __html: `<div class="wrap">
+<nav><a class="logo" href="#top">Purse</a><a class="btn ghost" href="/app">Get started</a></nav>
+
+<header class="hero" id="top">
+<div>
+<h1>Know what’s safe to spend today.</h1>
+<p class="lead">Purse is the money copilot for students. Type your spending like a text, see what’s left after rent and bills, and catch subscriptions you forgot you pay for. Your data stays on your device.</p>
+<div class="cta"><a class="btn" href="/app">Open App</a><a class="btn ghost" href="#envelopes">See how it works</a></div>
+</div>
+<div class="calc" aria-label="Safe to spend calculator">
+<h3>Try it with your numbers</h3>
+<div id="sliders"></div>
+<div class="big"><span>You can spend about</span><strong id="out">$0</strong><span id="sub" style="color:var(--mute)"></span></div>
+</div>
+</header>
+</div>
+
+<section><div class="wrap two">
+<div>
+<h2>Just say what you spent.</h2>
+<p class="lead">Paste a receipt, drop in a bank CSV or type it in plain words. Purse pulls out the merchant, amount, date and category in milliseconds, and flags anything it isn’t sure about so you can check it.</p>
+<p class="lead">Ask things like “Can I afford a $120 dinner tonight?” and it weighs your payday, upcoming bills and envelopes before it answers.</p>
+</div>
+<div class="chat">
+<div class="me">ramen with Sam, 14.50, yesterday</div>
+<div class="bot">Logged as an expense. Check it looks right:
+<div class="chips"><span>Ramen</span><span>−$14.50</span><span>Dining &amp; Nightlife</span><span>Yesterday</span><span>92% sure</span></div></div>
+<div class="me">Can I afford a $120 dinner tonight?</div>
+<div class="bot">Not comfortably. Rent leaves your account in 3 days and your Wants envelope has $62 left. A $45 dinner fits.</div>
+</div>
+</div></section>
+
+<section id="envelopes"><div class="wrap">
+<h2>Every dollar gets a job.</h2>
+<p class="lead">Purse splits your money into three envelopes using the 50/30/20 rule. Each one shows live headroom, turns yellow at 80% and red when you overspend.</p>
+<div class="env">
+<div><div class="top"><h3>Needs · 50%</h3><small>Rent, groceries, utilities, transport, health</small></div><div class="bar"><i class="warn" style="width:82%"></i></div><small>$410 of $500 used. Nearly there.</small></div>
+<div><div class="top"><h3>Wants · 30%</h3><small>Dining, entertainment, subscriptions, shopping</small></div><div class="bar"><i style="width:40%"></i></div><small>$120 of $300 used. Plenty of room.</small></div>
+<div><div class="top"><h3>Savings and debt · 20%</h3><small>Emergency vault, index funds, retirement</small></div><div class="bar"><i style="width:100%"></i></div><small>$200 of $200 set aside this month.</small></div>
+</div>
+</div></section>
+
+<section><div class="wrap">
+<h2>Find the subscriptions quietly eating your loan.</h2>
+<p class="lead">Purse spots overlapping services, price hikes and tools you haven’t opened in 30+ days. Tick the ones you’d cancel and watch the savings add up.</p>
+<div class="list">
+<label class="sub"><input type="checkbox" data-c="15.49"><span>Netflix Standard<span class="tag">overlaps</span><small>You also pay for the Hulu + Disney bundle</small></span><b>$15.49/mo</b></label>
+<label class="sub"><input type="checkbox" data-c="12.99"><span>Hulu + Disney bundle<small>Active, watched this week</small></span><b>$12.99/mo</b></label>
+<label class="sub"><input type="checkbox" data-c="54.99" checked><span>Adobe Creative Suite<span class="tag">unused 40 days</span><small>Last opened 40+ days ago</small></span><b>$54.99/mo</b></label>
+</div>
+<p class="total">You’d get back <b id="yr">$659.88</b> a year.</p>
+</div></section>
+
+<section><div class="wrap">
+<div class="runway">
+<div><div class="n">81 days</div></div>
+<div><h2>How long could you last with no income?</h2><p class="lead" style="color:inherit">Purse adds up your checking and savings, ignores the fun stuff, and divides by your essentials. With $2,400 saved and $900 of essentials a month, that’s 2.7 months, or 81 days to find a new job or a new loan instalment.</p></div>
+</div>
+</div></section>
+
+<section><div class="wrap two">
+<div>
+<h2>Purse asks before it changes anything.</h2>
+<p class="lead">The AI can only propose. Every change waits for your yes, and every applied change can be undone in one click, with your balance restored to the cent. Bigger moves like editing bills or overriding a balance always need your approval.</p>
+</div>
+<div class="act">
+<div class="flow" id="flow"><span id="s-Staged" class="on">Staged</span><span id="s-Applied">Applied</span><span id="s-Reverted">Reverted</span></div>
+<b>Dinner with housemates: −$18.00</b>
+<p style="color:var(--mute)">Balance: <b id="bal" style="color:var(--ink)">$640.00</b> · <span id="st">Waiting for you</span></p>
+<div class="btns" id="btns"></div>
+</div>
+</div></section>
+
+<section><div class="wrap">
+<h2>Private by design.</h2>
+<div class="pts">
+<div><h3>On your device</h3><p>Transactions, budgets and chats are stored in your browser. There’s no analytics server and no remote ledger.</p></div>
+<div><h3>Works offline</h3><p>Set up and review your money without a connection. Search runs locally in under 10 ms.</p></div>
+<div><h3>Keys stay hidden</h3><p>Gemini is called through a server proxy, so secret keys never reach your browser. Prefer OpenAI, DeepSeek or Zhipu GLM? Bring your own key.</p></div>
+</div>
+<div class="pts" style="margin-top:3rem">
+<div><h3>Meet Fiona</h3><p>A 3D companion who listens, talks back and lip-syncs, so checking your budget feels like chatting with a friend.</p></div>
+<div><h3>It remembers</h3><p>Rules like “keep dining under $95 a week” live in a plain Markdown file you can read and edit.</p></div>
+<div><h3>Open source</h3><p>MIT licensed and built for the 2026 Shenzhen International FinTech Competition.</p></div>
+</div>
+</div></section>
+
+<footer><div class="wrap">Purse Autonomous Finance · MIT License · Made for the 2026 Shenzhen International FinTech Competition</div></footer>` }} />
     </div>
   );
 };
+
+export default LandingPage;
