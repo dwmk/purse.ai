@@ -112,7 +112,7 @@ async function startServer() {
   // Chat & Agent Reasoning Proxy Endpoint
   app.post('/api/chat', async (req: Request, res: Response) => {
     try {
-      const {
+      let {
         provider = 'gemini',
         apiKey,
         model,
@@ -125,13 +125,19 @@ async function startServer() {
         return res.status(400).json({ error: 'Messages array is required' });
       }
 
-      // 1. EDGE PROVIDER (Browser-based execution)
+      // 1. EDGE PROVIDER: If key available, use it; otherwise signal browser-based execution
       if (provider === 'edge') {
-        return res.status(200).json({
-          reply: 'Edge model operates locally in browser storage.',
-          provider: 'edge',
-          model: 'smolLM2-360M-instruct'
-        });
+        const keyToUse = apiKey || process.env.GEMINI_API_KEY;
+        if (keyToUse && keyToUse !== 'MY_GEMINI_API_KEY') {
+          provider = 'gemini';
+        } else {
+          return res.status(200).json({
+            reply: '',
+            provider: 'edge',
+            model: 'smolLM2-135M-instruct',
+            missingKey: true
+          });
+        }
       }
 
       // 2. GEMINI PROVIDER

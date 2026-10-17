@@ -643,10 +643,17 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
         try {
           replyText = await runWindowAI(userInput, systemPrompt, onChunk);
         } catch (winErr) {
-          console.warn('Window AI error, falling back to in-browser engine:', winErr);
+          console.warn('Window AI notice, executing in-browser engine:', winErr);
+          replyText = await runBrowserEngine(userInput, context, onChunk);
+        }
+        if (!replyText || !replyText.trim()) {
           replyText = await runBrowserEngine(userInput, context, onChunk);
         }
       } else {
+        replyText = await runBrowserEngine(userInput, context, onChunk);
+      }
+
+      if (!replyText || !replyText.trim()) {
         replyText = await runBrowserEngine(userInput, context, onChunk);
       }
 
@@ -742,6 +749,12 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
     }
 
     const reply = data.reply || '';
+    if (!reply.trim()) {
+      const { runBrowserEngine } = await import('./browserLm');
+      const browserReply = await runBrowserEngine(userInput, context, onChunk);
+      return parseAgentResponseWithActions(browserReply, edgePlan, context, userInput);
+    }
+
     if (onChunk && reply) {
       await streamFallbackText(reply);
     }

@@ -33,6 +33,7 @@ export default defineConfig(() => {
           ]
         },
         workbox: {
+          maximumFileSizeToCacheInBytes: 35 * 1024 * 1024,
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [
             /^\/api/,
