@@ -91,7 +91,7 @@ export const TopBar: React.FC = () => {
           </nav>
         )}
 
-        {/* Zone 3: Micro-Interactions (3D Toggle + Mute TTS Toggle + Theme Switcher + Settings Icon) */}
+        {/* Micro-Interactions (3D Toggle + Mute TTS Toggle + Theme Switcher + Settings Icon) */}
         <div className="flex items-center gap-2 shrink-0">
           
           {/* 3D mode, sound and theme switcher buttons are only visible in /app and inactive on landing page / */}
@@ -140,28 +140,6 @@ export const TopBar: React.FC = () => {
                 )}
               </button>
             </>
-          )}
-
-          {isLanding ? (
-            <button
-              onClick={() => setCurrentView('chat')}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-xl transition-all tactile-btn cursor-pointer whitespace-nowrap shadow-xs ml-1"
-            >
-              <span>Open Purse</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setCurrentView('settings')}
-              title="Settings & System Governance"
-              className={`p-2 rounded-xl border transition-colors cursor-pointer tactile-btn ${
-                currentView === 'settings'
-                  ? 'border-violet-600 bg-violet-600 text-white font-bold'
-                  : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-            </button>
           )}
 
         </div>
