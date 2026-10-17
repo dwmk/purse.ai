@@ -313,7 +313,7 @@ export const SpeechService = {
     return this.isTtsSupported() && window.speechSynthesis.speaking;
   },
 
-  // Create STT Recognition instance
+  // Create STT Recognition instance with continuous listening
   createRecognition(
     onResult: (text: string) => void,
     onEnd: () => void,
@@ -325,17 +325,21 @@ export const SpeechService = {
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
 
-    recognition.continuous = false;
+    // Enable continuous listening so the engine does not stop after short pauses
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: any) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        finalTranscript += event.results[i][0].transcript;
+      let fullTranscript = '';
+      for (let i = 0; i < event.results.length; ++i) {
+        const piece = event.results[i][0]?.transcript?.trim();
+        if (piece) {
+          fullTranscript = fullTranscript ? `${fullTranscript} ${piece}` : piece;
+        }
       }
-      if (finalTranscript) {
-        onResult(finalTranscript);
+      if (fullTranscript) {
+        onResult(fullTranscript);
       }
     };
 

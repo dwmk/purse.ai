@@ -57,8 +57,18 @@ export const AgentChatView: React.FC = () => {
   const [isBrowserLmDownloading, setIsBrowserLmDownloading] = useState<boolean>(false);
 
   const recognitionRef = useRef<any>(null);
+  const isListeningRef = useRef(false);
+  const inputRef = useRef(input);
+  const baseInputRef = useRef('');
+  const inactivityTimerRef = useRef<any>(null);
+  const restartTimerRef = useRef<any>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: isGenerating ? 'auto' : 'smooth' });
@@ -79,27 +89,130 @@ export const AgentChatView: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Stop listening helper
+  const stopListening = () => {
+    isListeningRef.current = false;
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  };
+
   // Clean up speech recognition on unmount
   useEffect(() => {
     return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {}
-      }
+      stopListening();
       SpeechService.stopSpeaking();
     };
   }, []);
 
+  // Starts active speech recognition session
+  const startListeningSession = () => {
+    if (!SpeechService.isSttSupported()) {
+      showNotification('error', 'Microphone speech recognition is not supported or not available in this browser.');
+      return;
+    }
+
+    try {
+      SpeechService.stopSpeaking();
+      isListeningRef.current = true;
+      setIsListening(true);
+
+      // Inactivity timeout: auto-stop after 90 seconds of zero activity
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      inactivityTimerRef.current = setTimeout(() => {
+        if (isListeningRef.current) {
+          stopListening();
+        }
+      }, 90000);
+
+      const recognition = SpeechService.createRecognition(
+        (transcript: string) => {
+          // Reset inactivity timeout on speech detection
+          if (inactivityTimerRef.current) {
+            clearTimeout(inactivityTimerRef.current);
+          }
+          inactivityTimerRef.current = setTimeout(() => {
+            if (isListeningRef.current) {
+              stopListening();
+            }
+          }, 90000);
+
+          const base = baseInputRef.current;
+          const full = base ? `${base} ${transcript}` : transcript;
+          setInput(full);
+          inputRef.current = full;
+        },
+        () => {
+          // onEnd: Keep mic on until user decides to turn it off or sends message
+          if (isListeningRef.current) {
+            baseInputRef.current = inputRef.current.trim();
+            if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+            restartTimerRef.current = setTimeout(() => {
+              if (!isListeningRef.current) return;
+              try {
+                if (recognitionRef.current) {
+                  try {
+                    recognitionRef.current.abort();
+                  } catch {}
+                }
+                startListeningSession();
+              } catch (e) {
+                console.warn('Speech recognition restart notice:', e);
+              }
+            }, 100);
+          } else {
+            setIsListening(false);
+          }
+        },
+        (errCode: string) => {
+          // Transient pauses ('no-speech') or interruptions do NOT terminate continuous mic
+          if (errCode === 'no-speech' || errCode === 'aborted') {
+            return;
+          }
+
+          // Unrecoverable errors stop listening
+          stopListening();
+          if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
+            showNotification('error', 'Microphone access not provided. Please grant microphone permissions in your browser to speak.');
+          } else if (errCode === 'audio-capture') {
+            showNotification('error', 'Microphone not found. No audio input device detected.');
+          } else if (errCode === 'network') {
+            showNotification('error', 'Network error during speech recognition. Please check your internet connection.');
+          } else {
+            showNotification('error', `Speech recognition notice: ${errCode}. You can also type directly.`);
+          }
+        }
+      );
+
+      if (recognition) {
+        recognitionRef.current = recognition;
+        recognition.start();
+      }
+    } catch (err: any) {
+      console.warn('Microphone start error:', err);
+      stopListening();
+      showNotification('error', 'Microphone access could not be started.');
+    }
+  };
+
   // Web Speech API: Start / Stop Voice Input with permission check & notification
   const toggleSpeechToText = async () => {
     if (isListening) {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
-      setIsListening(false);
+      stopListening();
       return;
     }
 
@@ -115,7 +228,7 @@ export const AgentChatView: React.FC = () => {
         try {
           const perm = await navigator.permissions.query({ name: 'microphone' as any });
           if (perm.state === 'denied') {
-            setIsListening(false);
+            stopListening();
             showNotification('error', 'Microphone access not provided. Please enable microphone permissions in your browser settings.');
             return;
           }
@@ -128,7 +241,7 @@ export const AgentChatView: React.FC = () => {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const audioInputs = devices.filter(d => d.kind === 'audioinput');
           if (devices.length > 0 && audioInputs.length === 0) {
-            setIsListening(false);
+            stopListening();
             showNotification('error', 'Microphone not found. No audio input device detected on your system.');
             return;
           }
@@ -142,7 +255,7 @@ export const AgentChatView: React.FC = () => {
           stream.getTracks().forEach(track => track.stop());
         } catch (mediaErr: any) {
           console.warn('Microphone permission check failed:', mediaErr);
-          setIsListening(false);
+          stopListening();
           const errName = mediaErr.name || '';
           if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError' || mediaErr.message?.includes('Permission denied')) {
             showNotification('error', 'Microphone access not provided. Please allow microphone permissions to speak to Fiona.');
@@ -158,41 +271,8 @@ export const AgentChatView: React.FC = () => {
       }
     }
 
-    try {
-      SpeechService.stopSpeaking();
-      const recognition = SpeechService.createRecognition(
-        (transcript: string) => {
-          setInput(transcript);
-        },
-        () => {
-          setIsListening(false);
-        },
-        (errCode: string) => {
-          setIsListening(false);
-          if (errCode === 'not-allowed' || errCode === 'service-not-allowed') {
-            showNotification('error', 'Microphone access not provided. Please grant microphone permissions in your browser to speak.');
-          } else if (errCode === 'audio-capture') {
-            showNotification('error', 'Microphone not found. No audio input device detected.');
-          } else if (errCode === 'network') {
-            showNotification('error', 'Network error during speech recognition. Please check your internet connection.');
-          } else if (errCode && errCode !== 'no-speech' && errCode !== 'aborted') {
-            showNotification('error', `Speech recognition error: ${errCode}. Please try again or type.`);
-          }
-        }
-      );
-
-      if (recognition) {
-        recognitionRef.current = recognition;
-        recognition.start();
-        setIsListening(true);
-      } else {
-        showNotification('error', 'Microphone speech recognition is not supported or not available in this browser.');
-      }
-    } catch (err: any) {
-      console.warn('Microphone error:', err);
-      setIsListening(false);
-      showNotification('error', 'Microphone access not provided or device not found.');
-    }
+    baseInputRef.current = inputRef.current.trim();
+    startListeningSession();
   };
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -200,10 +280,9 @@ export const AgentChatView: React.FC = () => {
     if (!input.trim() || isGenerating) return;
     const text = input;
     setInput('');
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
+    inputRef.current = '';
+    baseInputRef.current = '';
+    stopListening();
     await sendMessage(text);
   };
 
@@ -636,7 +715,7 @@ export const AgentChatView: React.FC = () => {
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder={isListening ? 'Listening to your speech...' : 'Type or speak: "Spent $35 on groceries"...'}
+            placeholder={isListening ? 'Listening... Speak at your pace, tap mic to stop or send when done' : 'Type or speak: "Spent $35 on groceries"...'}
             className="flex-1 bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none min-w-0 font-medium"
             disabled={isGenerating}
           />
@@ -645,7 +724,7 @@ export const AgentChatView: React.FC = () => {
           <button
             type="button"
             onClick={toggleSpeechToText}
-            title={isListening ? 'Stop listening' : 'Speak into mic'}
+            title={isListening ? 'Mic active (keeps listening) — click to stop' : 'Speak into mic'}
             className={`p-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
               isListening
                 ? 'bg-rose-500 text-white animate-pulse ring-2 ring-rose-300'
