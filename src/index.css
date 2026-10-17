@@ -7,112 +7,48 @@
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'IBM Plex Mono', monospace;
 
-  /* The 5 Official Purse Colors Exclusively */
-  --color-lavender: #B59DD1;
-  --color-amethyst: #8A7EA4;
-  --color-rose: #C794B0;
-  --color-blossom: #F3ACB4;
-  --color-peach: #F9BBAE;
+  /* Renovated & Refined Purse Brand Color Tokens */
+  --color-purse-violet: #7C3AED;
+  --color-purse-violet-hover: #6D28D9;
+  --color-purse-amethyst: #6366F1;
+  --color-purse-lavender: #A78BFA;
+  --color-purse-rose: #F43F5E;
+  --color-purse-emerald: #10B981;
+  --color-purse-amber: #F59E0B;
 
-  --color-purse-lavender: #B59DD1;
-  --color-purse-amethyst: #8A7EA4;
-  --color-purse-rose: #C794B0;
-  --color-purse-blossom: #F3ACB4;
-  --color-purse-peach: #F9BBAE;
-
-  /* Strict remapping of all Tailwind utility color scales to the 5 colors */
-  --color-white: #F9BBAE;
-  --color-black: #8A7EA4;
-
-  --color-neutral-50: #F9BBAE;
-  --color-neutral-100: #F9BBAE;
-  --color-neutral-200: #F3ACB4;
-  --color-neutral-300: #C794B0;
-  --color-neutral-400: #B59DD1;
-  --color-neutral-500: #8A7EA4;
-  --color-neutral-600: #8A7EA4;
-  --color-neutral-700: #8A7EA4;
-  --color-neutral-800: #8A7EA4;
-  --color-neutral-900: #8A7EA4;
-  --color-neutral-950: #8A7EA4;
-
-  --color-gray-50: #F9BBAE;
-  --color-gray-100: #F9BBAE;
-  --color-gray-200: #F3ACB4;
-  --color-gray-300: #C794B0;
-  --color-gray-400: #B59DD1;
-  --color-gray-500: #8A7EA4;
-  --color-gray-600: #8A7EA4;
-  --color-gray-700: #8A7EA4;
-  --color-gray-800: #8A7EA4;
-  --color-gray-900: #8A7EA4;
-  --color-gray-950: #8A7EA4;
-
-  --color-zinc-50: #F9BBAE;
-  --color-zinc-100: #F9BBAE;
-  --color-zinc-200: #F3ACB4;
-  --color-zinc-300: #C794B0;
-  --color-zinc-400: #B59DD1;
-  --color-zinc-500: #8A7EA4;
-  --color-zinc-600: #8A7EA4;
-  --color-zinc-700: #8A7EA4;
-  --color-zinc-800: #8A7EA4;
-  --color-zinc-900: #8A7EA4;
-  --color-zinc-950: #8A7EA4;
-
-  --color-slate-50: #F9BBAE;
-  --color-slate-100: #F9BBAE;
-  --color-slate-200: #F3ACB4;
-  --color-slate-300: #C794B0;
-  --color-slate-400: #B59DD1;
-  --color-slate-500: #8A7EA4;
-  --color-slate-600: #8A7EA4;
-  --color-slate-700: #8A7EA4;
-  --color-slate-800: #8A7EA4;
-  --color-slate-900: #8A7EA4;
-  --color-slate-950: #8A7EA4;
-
-  --color-emerald-400: #8A7EA4;
-  --color-emerald-500: #8A7EA4;
-  --color-emerald-600: #8A7EA4;
-  --color-green-500: #8A7EA4;
-  --color-red-400: #8A7EA4;
-  --color-red-500: #8A7EA4;
-  --color-red-600: #8A7EA4;
-  --color-blue-400: #8A7EA4;
-  --color-blue-500: #8A7EA4;
-  --color-blue-600: #8A7EA4;
-  --color-amber-400: #C794B0;
-  --color-amber-500: #C794B0;
-  --color-amber-600: #8A7EA4;
+  --color-lavender: #A78BFA;
+  --color-amethyst: #7C3AED;
+  --color-rose: #F43F5E;
+  --color-blossom: #F472B6;
+  --color-peach: #FB923C;
 }
 
 @layer base {
-  /* Default Light Mode */
+  /* Renovated Light Theme: Clean, crisp, high-contrast fintech aesthetic */
   html:not(.dark) {
     color-scheme: light;
-    background-color: #FAF8F9;
-    color: #8A7EA4;
+    background-color: #F8F9FB;
+    color: #18181B;
   }
 
-  /* Dark Mode */
+  /* Renovated Dark Theme: Deep obsidian black with rich purple/violet undertones */
   html.dark {
     color-scheme: dark;
-    background-color: #16131A;
-    color: #F9BBAE;
+    background-color: #0A0910;
+    color: #F4F4F5;
   }
 
   body {
     font-family: var(--font-sans);
     min-height: 100vh;
-    background-color: #FAF8F9;
-    color: #8A7EA4;
+    background-color: #F8F9FB;
+    color: #18181B;
     transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   html.dark body {
-    background-color: #16131A;
-    color: #F9BBAE;
+    background-color: #0A0910;
+    color: #F4F4F5;
   }
 
   .font-mono, [data-mono="true"] {
@@ -121,34 +57,38 @@
   }
 }
 
-/* SOLID COLOR UTILITIES - ALL GRADIENTS REMOVED */
+/* Brand Utility Gradients & Accents */
 .bg-purse-gradient {
-  background-color: #8A7EA4 !important;
-  color: #F9BBAE !important;
+  background: linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%);
+  color: #FFFFFF !important;
 }
 
 .text-purse-gradient {
-  color: #8A7EA4 !important;
-  background: none !important;
-  -webkit-background-clip: unset !important;
-  -webkit-text-fill-color: initial !important;
+  background: linear-gradient(135deg, #7C3AED 0%, #6366F1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .bg-purse-soft {
-  background-color: #F3ACB4 !important;
+  background-color: #EDE9FE;
+  color: #6D28D9;
+}
+.dark .bg-purse-soft {
+  background-color: rgba(124, 58, 237, 0.2);
+  color: #DDD6FE;
 }
 
 /* Surface Panels */
 .glass-panel-light {
-  background-color: #F3ACB4;
-  border: 1px solid #C794B0;
-  box-shadow: 0 4px 16px 0 rgba(138, 126, 164, 0.08);
+  background-color: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(228, 228, 231, 0.9);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
 }
 
 .glass-panel-dark {
-  background-color: #8A7EA4;
-  border: 1px solid #B59DD1;
-  box-shadow: 0 4px 16px 0 rgba(138, 126, 164, 0.2);
+  background-color: rgba(18, 17, 24, 0.92);
+  border: 1px solid rgba(39, 39, 42, 0.9);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
 /* Card Bevel & Tactile Press */
@@ -166,7 +106,7 @@
   transform: scale(0.97);
 }
 
-/* Audio waveform animation for voice input - Pure 5-Color Elements */
+/* Audio waveform animation for voice input - Refined Violet Spectrum */
 @keyframes wave-pulse {
   0%, 100% {
     height: 6px;
@@ -176,11 +116,11 @@
   }
 }
 
-.audio-bar-1 { animation: wave-pulse 0.7s ease-in-out infinite; background-color: #8A7EA4; }
-.audio-bar-2 { animation: wave-pulse 0.9s ease-in-out infinite 0.15s; background-color: #B59DD1; }
-.audio-bar-3 { animation: wave-pulse 0.6s ease-in-out infinite 0.3s; background-color: #C794B0; }
-.audio-bar-4 { animation: wave-pulse 0.8s ease-in-out infinite 0.2s; background-color: #F3ACB4; }
-.audio-bar-5 { animation: wave-pulse 0.65s ease-in-out infinite 0.1s; background-color: #8A7EA4; }
+.audio-bar-1 { animation: wave-pulse 0.7s ease-in-out infinite; background-color: #7C3AED; }
+.audio-bar-2 { animation: wave-pulse 0.9s ease-in-out infinite 0.15s; background-color: #8B5CF6; }
+.audio-bar-3 { animation: wave-pulse 0.6s ease-in-out infinite 0.3s; background-color: #A78BFA; }
+.audio-bar-4 { animation: wave-pulse 0.8s ease-in-out infinite 0.2s; background-color: #C4B5FD; }
+.audio-bar-5 { animation: wave-pulse 0.65s ease-in-out infinite 0.1s; background-color: #7C3AED; }
 
 /* Markdown Content Typography Formatting */
 .markdown-body {
@@ -231,7 +171,10 @@
 }
 
 .markdown-body li::marker {
-  color: #8A7EA4;
+  color: #7C3AED;
+}
+.dark .markdown-body li::marker {
+  color: #A78BFA;
 }
 
 .markdown-body strong, .markdown-body b {
@@ -244,22 +187,25 @@
 }
 
 .markdown-body a {
-  color: #8A7EA4;
+  color: #7C3AED;
   text-decoration: underline;
   text-underline-offset: 3px;
   font-weight: 600;
 }
 .dark .markdown-body a {
-  color: #F9BBAE;
+  color: #A78BFA;
 }
 
 .markdown-body blockquote {
-  border-left: 3px solid #8A7EA4;
+  border-left: 3px solid #7C3AED;
   padding-left: 0.85rem;
   margin-top: 0.5em;
   margin-bottom: 0.5em;
   font-style: italic;
   opacity: 0.95;
+}
+.dark .markdown-body blockquote {
+  border-left-color: #A78BFA;
 }
 
 .markdown-body code {
@@ -267,9 +213,13 @@
   font-size: 0.86em;
   padding: 0.15em 0.4em;
   border-radius: 0.35rem;
-  background-color: #F3ACB4;
-  color: #8A7EA4;
+  background-color: #EDE9FE;
+  color: #6D28D9;
   font-weight: 600;
+}
+.dark .markdown-body code {
+  background-color: #2E1065;
+  color: #DDD6FE;
 }
 
 .markdown-body pre {
@@ -277,19 +227,19 @@
   font-size: 0.82em;
   padding: 0.75rem 1rem;
   border-radius: 0.75rem;
-  background-color: #8A7EA4;
-  color: #F9BBAE;
+  background-color: #18181B;
+  color: #F4F4F5;
   overflow-x: auto;
   margin-top: 0.5em;
   margin-bottom: 0.6em;
-  border: 1px solid #B59DD1;
+  border: 1px solid #27272A;
 }
 
 .markdown-body pre code {
   background: transparent;
   padding: 0;
   border-radius: 0;
-  color: #F9BBAE;
+  color: #F4F4F5;
   font-weight: 400;
 }
 
@@ -302,40 +252,60 @@
 }
 
 .markdown-body th, .markdown-body td {
-  border: 1px solid #C794B0;
+  border: 1px solid #E4E4E7;
   padding: 0.4rem 0.65rem;
   text-align: left;
 }
+.dark .markdown-body th, .dark .markdown-body td {
+  border-color: #27272A;
+}
 
 .markdown-body th {
-  background-color: #B59DD1;
-  color: #8A7EA4;
+  background-color: #F4F4F5;
+  color: #18181B;
   font-weight: 700;
+}
+.dark .markdown-body th {
+  background-color: #18181B;
+  color: #F4F4F5;
 }
 
 .markdown-body td {
-  background-color: #F3ACB4;
-  color: #8A7EA4;
+  background-color: #FFFFFF;
+  color: #18181B;
+}
+.dark .markdown-body td {
+  background-color: #121216;
+  color: #F4F4F5;
 }
 
 .markdown-body hr {
   border: 0;
-  border-top: 1px solid #C794B0;
+  border-top: 1px solid #E4E4E7;
   margin: 0.75rem 0;
 }
+.dark .markdown-body hr {
+  border-top-color: #27272A;
+}
 
-/* Scrollbars */
+/* Modern Minimalist Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F9BBAE;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #C794B0;
-  border-radius: 4px;
+  background: #D4D4D8;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #8A7EA4;
+  background: #A1A1AA;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #27272A;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3F3F46;
 }

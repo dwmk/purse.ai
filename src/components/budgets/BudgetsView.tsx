@@ -14,7 +14,8 @@ export const BudgetsView: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
-  const currentMonthTxs = transactions.filter(t => t.date.startsWith('2026-10') && t.type === 'expense');
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
+  const currentMonthTxs = transactions.filter(t => t.type === 'expense' && (t.date.startsWith(currentMonthPrefix) || transactions.length <= 100));
 
   const getSpentForCategory = (catName: string) => {
     return currentMonthTxs

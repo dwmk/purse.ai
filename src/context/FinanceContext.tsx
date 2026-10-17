@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Account,
+  AccountType,
   AgentAction,
   AppView,
   Bill,
@@ -8,12 +9,14 @@ import {
   ChatMessage,
   ConversationSession,
   LLMConfig,
+  LLMProvider,
   MemoryFile,
   Transaction
 } from '../types/finance';
 import { StorageService } from '../services/storage';
 import { processAgentMessage } from '../services/agentEngine';
 import { SpeechService, registerSubtitleListener, getFionaGreeting } from '../services/speech';
+import { OrganizedIngestionResult } from '../services/ingestion';
 
 interface FinanceContextType {
   accounts: Account[];
@@ -40,7 +43,11 @@ interface FinanceContextType {
   theme: 'dark' | 'light';
   currentView: AppView;
   isGenerating: boolean;
-  notification: { type: 'success' | 'error' | 'info'; message: string } | null;
+  notification: {
+    type: 'success' | 'error' | 'info';
+    message: string;
+    action?: { label: string; onClick: () => void };
+  } | null;
   isSpeechEnabled: boolean;
   setIsSpeechEnabled: (enabled: boolean) => void;
   speakingMsgId: string | null;
@@ -50,7 +57,11 @@ interface FinanceContextType {
   storageUsage: { bytes: number; formatted: string };
   refreshStorageUsage: () => void;
   clearNotification: () => void;
-  showNotification: (type: 'success' | 'error' | 'info', message: string) => void;
+  showNotification: (
+    type: 'success' | 'error' | 'info',
+    message: string,
+    action?: { label: string; onClick: () => void }
+  ) => void;
   setCurrentView: (view: AppView) => void;
   toggleTheme: () => void;
   sendMessage: (text: string) => Promise<void>;
@@ -71,6 +82,20 @@ interface FinanceContextType {
   importCsv: (csvStr: string) => { success: boolean; addedCount: number; message: string };
   resetAllData: () => void;
   wipeEverything: () => void;
+  isInitialized: boolean;
+  showInitializationModal: boolean;
+  setShowInitializationModal: (show: boolean) => void;
+  initializeWithData: (data: OrganizedIngestionResult) => void;
+  initializeBlank: (
+    accountName: string,
+    accountType: AccountType,
+    startingBalance: number,
+    currency: string
+  ) => void;
+  missingApiKeyProvider: LLMProvider | null;
+  setMissingApiKeyProvider: (provider: LLMProvider | null) => void;
+  highlightedApiKeyProvider: LLMProvider | null;
+  openSettingsForProvider: (provider: LLMProvider) => void;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -186,7 +211,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   });
 
   const [isGenerating, setIsGenerating] = useState(false);
-  const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [isInitialized, setIsInitialized] = useState<boolean>(() => StorageService.isInitialized());
+  const [showInitializationModal, setShowInitializationModal] = useState<boolean>(() => !StorageService.isInitialized());
+  const [missingApiKeyProvider, setMissingApiKeyProvider] = useState<LLMProvider | null>(null);
+  const [highlightedApiKeyProvider, setHighlightedApiKeyProvider] = useState<LLMProvider | null>(null);
+
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+    action?: { label: string; onClick: () => void };
+  } | null>(null);
 
   // 3D Mode & Subtitle states
   const [is3DMode, setIs3DModeState] = useState<boolean>(() => {
@@ -308,14 +342,89 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
-    setNotification({ type, message });
+  const showNotification = (
+    type: 'success' | 'error' | 'info',
+    message: string,
+    action?: { label: string; onClick: () => void }
+  ) => {
+    setNotification({ type, message, action });
     setTimeout(() => {
       setNotification(prev => (prev?.message === message ? null : prev));
-    }, 4500);
+    }, 6500);
   };
 
   const clearNotification = () => setNotification(null);
+
+  const openSettingsForProvider = (provider: LLMProvider) => {
+    setCurrentView('settings');
+    setHighlightedApiKeyProvider(provider);
+    setMissingApiKeyProvider(null);
+  };
+
+  const initializeWithData = (data: OrganizedIngestionResult) => {
+    setAccounts(data.accounts);
+    StorageService.saveAccounts(data.accounts);
+
+    setTransactions(data.transactions);
+    StorageService.saveTransactions(data.transactions);
+
+    setBills(data.bills);
+    StorageService.saveBills(data.bills);
+
+    setBudgets(data.budgets);
+    StorageService.saveBudgets(data.budgets);
+
+    const updatedMemory: MemoryFile = {
+      ...memory,
+      profile: {
+        ...memory.profile,
+        monthlyIncome: data.summary.suggestedMonthlyIncome || data.summary.totalInflow || 0,
+        currency: data.accounts[0]?.currency || 'USD'
+      },
+      lastUpdated: new Date().toISOString()
+    };
+    setMemory(updatedMemory);
+    StorageService.saveMemory(updatedMemory);
+
+    StorageService.setInitialized(true);
+    setIsInitialized(true);
+    setShowInitializationModal(false);
+    setCurrentView('overview');
+    showNotification('success', `Initialized ledger with ${data.transactions.length} transactions across ${data.accounts.length} account(s).`);
+  };
+
+  const initializeBlank = (
+    accountName: string,
+    accountType: AccountType,
+    startingBalance: number,
+    currency: string
+  ) => {
+    const newAccount: Account = {
+      id: `acc_clean_${Date.now()}`,
+      name: accountName || 'Primary Checking',
+      type: accountType || 'checking',
+      balance: startingBalance || 0,
+      currency: currency || 'USD',
+      institution: 'Primary Bank',
+      accountNumberMask: '•••• 0001',
+      lastUpdated: new Date().toISOString()
+    };
+
+    setAccounts([newAccount]);
+    StorageService.saveAccounts([newAccount]);
+
+    setTransactions([]);
+    StorageService.saveTransactions([]);
+
+    setBills([]);
+    StorageService.saveBills([]);
+
+    StorageService.setInitialized(true);
+    setIsInitialized(true);
+    setShowInitializationModal(false);
+    setCurrentView('chat');
+    showNotification('success', `Created clean account "${newAccount.name}" with $${startingBalance.toFixed(2)} balance.`);
+  };
 
   const toggleTheme = () => {
     setTheme(prev => {
@@ -516,7 +625,38 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const stage1Conversations = conversations.map(c => c.id === targetConv.id ? updatedConvStage1 : c);
     setConversations(stage1Conversations);
     StorageService.saveConversations(stage1Conversations);
-    StorageService.saveChatHistory(newChatList);
+    const currentProv = config.provider;
+    const isApiKeyRequired = currentProv === 'openai' || currentProv === 'deepseek' || currentProv === 'zai';
+    const hasKey = Boolean(config.apiKey && config.apiKey.trim());
+
+    if (isApiKeyRequired && !hasKey) {
+      setMissingApiKeyProvider(currentProv);
+      showNotification(
+        'error',
+        `Missing API Key: ${currentProv.toUpperCase()} requires an API key to process your request.`,
+        {
+          label: 'Fix',
+          onClick: () => openSettingsForProvider(currentProv)
+        }
+      );
+
+      const errSystemMsg: ChatMessage = {
+        id: `msg_err_apikey_${Date.now()}`,
+        sender: 'system',
+        content: `⚠️ **API Key Required**: You have selected **${currentProv.toUpperCase()}**, but no API key is configured. Please enter your API key in Settings, or switch to **Browser Edge (Local)** for 100% offline usage.`,
+        timestamp: new Date().toISOString()
+      };
+
+      const finalChat = [...newChatList, errSystemMsg];
+      const updatedConv: ConversationSession = {
+        ...updatedConvStage1,
+        messages: finalChat
+      };
+      setConversations(prev => prev.map(c => c.id === targetConv.id ? updatedConv : c));
+      StorageService.saveConversations(conversations.map(c => c.id === targetConv.id ? updatedConv : c));
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -738,17 +878,19 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const resetAllData = () => {
-    StorageService.resetToSeed();
-    setAccounts(StorageService.getAccounts());
-    setTransactions(StorageService.getTransactions());
-    setBills(StorageService.getBills());
+    StorageService.clearAllData();
+    setAccounts([]);
+    setTransactions([]);
+    setBills([]);
     setBudgets(StorageService.getBudgets());
     setMemory(StorageService.getMemory());
     setConversations(StorageService.getConversations());
     setActiveConversationIdState(StorageService.getActiveConversationId());
     setActions([]);
+    setIsInitialized(false);
+    setShowInitializationModal(true);
     refreshStorageUsage();
-    showNotification('info', 'Reset all records to authentic seed dataset.');
+    showNotification('info', 'Reset ledger. Ready to initialize with your transactions.');
   };
 
   // Double-confirmation complete wipe of all data
@@ -758,12 +900,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts([]);
     setTransactions([]);
     setBills([]);
-    setBudgets([]);
+    setBudgets(StorageService.getBudgets());
     setActions([]);
-    setConversations([]);
+    setConversations(StorageService.getConversations());
     setMemory(StorageService.getMemory());
+    setIsInitialized(false);
+    setShowInitializationModal(true);
+    setCurrentView('landing');
     refreshStorageUsage();
-    showNotification('info', 'All browser storage has been completely erased.');
+    showNotification('info', 'All browser storage has been completely erased. You can start fresh or import data.');
   };
 
   return (
@@ -823,7 +968,16 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         importJson,
         importCsv,
         resetAllData,
-        wipeEverything
+        wipeEverything,
+        isInitialized,
+        showInitializationModal,
+        setShowInitializationModal,
+        initializeWithData,
+        initializeBlank,
+        missingApiKeyProvider,
+        setMissingApiKeyProvider,
+        highlightedApiKeyProvider,
+        openSettingsForProvider
       }}
     >
       {children}

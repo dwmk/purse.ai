@@ -1,15 +1,7 @@
-// Web Speech API Service: Guaranteed Female TTS, Subtitle Tracking & STT
+import { lipSyncManager } from './lipSync';
 
-export interface SpeechRecognitionHook {
-  isSupported: boolean;
-  isListening: boolean;
-  transcript: string;
-  startListening: (onResult: (text: string) => void) => void;
-  stopListening: () => void;
-}
-
-// Curated array of prioritized female voice names across Windows, macOS, iOS, Android & ChromeOS
-export const FEMALE_VOICE_PACKS = [
+// Comprehensive array of prioritized female voice names across Windows, macOS, iOS, Android & ChromeOS
+export const FEMALE_VOICE_PACKS: string[] = [
   'fiona',
   'samantha',
   'victoria',
@@ -27,19 +19,42 @@ export const FEMALE_VOICE_PACKS = [
   'sangeeta',
   'moira',
   'joana',
+  'kendra',
+  'carmen',
+  'alva',
+  'clara',
+  'lisa',
+  'sarah',
+  'emma',
+  'helena',
+  'jenny',
+  'aria',
+  'sonia',
+  'mia',
+  'ana',
+  'female',
+  'woman',
+  'google us english (female)',
+  'google uk english female',
   'google us english',
   'natural (female)',
   'microsoft zira',
+  'microsoft aria',
+  'microsoft jenny',
   'en-us-female',
-  'female'
+  'en-gb-female',
+  'en-au-female'
 ];
 
-export const MALE_VOICE_FILTERS = [
+export const MALE_VOICE_FILTERS: string[] = [
   'david', 'daniel', 'george', 'mark', 'richard', 'alex', 'fred',
-  'oliver', 'rishi', 'tom', 'male', 'guy', 'james', 'brian'
+  'oliver', 'rishi', 'tom', 'male', 'guy', 'james', 'brian', 'ryan',
+  'eric', 'steve', 'michael', 'paul', 'christopher', 'adam', 'benjamin',
+  'matthew', 'justin', 'steven', 'john', 'carlos', 'bernard', 'arthur',
+  'liam', 'noah', 'lucas', 'mason'
 ];
 
-// Active subtitle listener
+// Active subtitle listener registry
 let subtitleListeners: Array<(text: string, isSpeaking: boolean) => void> = [];
 
 export const registerSubtitleListener = (fn: (text: string, isSpeaking: boolean) => void) => {
@@ -50,8 +65,32 @@ export const registerSubtitleListener = (fn: (text: string, isSpeaking: boolean)
 };
 
 const notifySubtitles = (text: string, isSpeaking: boolean) => {
-  subtitleListeners.forEach(listener => listener(text, isSpeaking));
+  subtitleListeners.forEach(listener => {
+    try {
+      listener(text, isSpeaking);
+    } catch (e) {
+      console.warn('Subtitle listener error:', e);
+    }
+  });
 };
+
+// Cache voices eagerly to handle asynchronous voice initialization in Chrome & Safari
+let cachedVoices: SpeechSynthesisVoice[] = [];
+
+const updateVoiceCache = () => {
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    const voices = window.speechSynthesis.getVoices();
+    if (voices && voices.length > 0) {
+      cachedVoices = voices;
+    }
+  }
+};
+
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  updateVoiceCache();
+  window.speechSynthesis.addEventListener('voiceschanged', updateVoiceCache);
+  window.speechSynthesis.onvoiceschanged = updateVoiceCache;
+}
 
 export function getFionaGreeting(): string {
   if (typeof window === 'undefined') return "Welcome to Purse!";
@@ -87,38 +126,60 @@ export const SpeechService = {
   // Pick guaranteed female voice from Web Speech API
   getGuaranteedFemaleVoice(): SpeechSynthesisVoice | null {
     if (!this.isTtsSupported()) return null;
-    const voices = window.speechSynthesis.getVoices();
+    let voices = cachedVoices.length > 0 ? cachedVoices : window.speechSynthesis.getVoices();
     if (voices.length === 0) return null;
 
-    // 1. Direct match on curated female voice packs
+    // 1. Direct match against curated female voice packs, excluding any matching male keywords
     for (const femaleName of FEMALE_VOICE_PACKS) {
       const match = voices.find(v => {
         const nameLower = v.name.toLowerCase();
-        return nameLower.includes(femaleName) && !MALE_VOICE_FILTERS.some(m => nameLower.includes(m));
+        const uriLower = (v.voiceURI || '').toLowerCase();
+        const hasFemaleIdentifier = nameLower.includes(femaleName) || uriLower.includes(femaleName);
+        const hasMaleMarker = MALE_VOICE_FILTERS.some(m => nameLower.includes(m) || uriLower.includes(m));
+        return hasFemaleIdentifier && !hasMaleMarker;
       });
       if (match) return match;
     }
 
-    // 2. Fallback: Any English voice that does not match male identifiers
-    const englishFemaleFallback = voices.find(v => {
+    // 2. Any voice tagged with "female" or "woman" in name or lang
+    const anyFemaleTagged = voices.find(v => {
+      const nameLower = v.name.toLowerCase();
+      const hasFemaleWord = nameLower.includes('female') || nameLower.includes('woman');
+      const hasMaleMarker = MALE_VOICE_FILTERS.some(m => nameLower.includes(m));
+      return hasFemaleWord && !hasMaleMarker;
+    });
+    if (anyFemaleTagged) return anyFemaleTagged;
+
+    // 3. Fallback: English voice that does not match any known male names
+    const englishNonMale = voices.find(v => {
       const nameLower = v.name.toLowerCase();
       const isEnglish = v.lang.startsWith('en');
       const isMale = MALE_VOICE_FILTERS.some(m => nameLower.includes(m));
       return isEnglish && !isMale;
     });
+    if (englishNonMale) return englishNonMale;
 
-    if (englishFemaleFallback) return englishFemaleFallback;
+    // 4. Any voice that does not match male filters
+    const anyNonMale = voices.find(v => {
+      const nameLower = v.name.toLowerCase();
+      return !MALE_VOICE_FILTERS.some(m => nameLower.includes(m));
+    });
+    if (anyNonMale) return anyNonMale;
 
-    // 3. Fallback to first voice
     return voices[0] || null;
   },
 
-  speak(text: string, onEnd?: () => void, onWord?: (word: string) => void, showSubtitles: boolean = true): void {
+  speak(
+    text: string,
+    onEnd?: () => void,
+    onWord?: (word: string) => void,
+    showSubtitles: boolean = true
+  ): void {
     if (!this.isTtsSupported()) return;
     try {
-      window.speechSynthesis.cancel(); // Stop any previous speech
+      window.speechSynthesis.cancel(); // Stop any active speech
 
-      // Clean markdown formatting for clean audio utterance
+      // Clean markdown symbols, asterisks, brackets, and code tags for spoken utterance
       const cleanText = text
         .replace(/#{1,6}\s+/g, '')
         .replace(/\*\*(.*?)\*\*/g, '$1')
@@ -136,8 +197,8 @@ export const SpeechService = {
       }
 
       const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.rate = 1.05;
-      utterance.pitch = 1.15; // Slightly higher pitch appropriate for natural female timbre
+      utterance.rate = 1.02; // Natural, conversational cadence
+      utterance.pitch = 1.16; // Higher pitch range ensuring bright female vocal frequency
 
       // Assign guaranteed female voice
       const femaleVoice = this.getGuaranteedFemaleVoice();
@@ -145,22 +206,69 @@ export const SpeechService = {
         utterance.voice = femaleVoice;
       }
 
-      // Initial subtitle broadcast (if enabled)
-      notifySubtitles(showSubtitles ? cleanText : '', true);
+      const words = cleanText.split(/\s+/).filter(Boolean);
+      let wordIndex = 0;
+      let streamInterval: any = null;
 
-      // Real-time boundary event to track progress of spoken text
-      utterance.onboundary = (event) => {
-        if (event.name === 'word') {
-          const spokenSoFar = cleanText.substring(0, event.charIndex + (event.charLength || 6));
-          if (showSubtitles) {
-            notifySubtitles(spokenSoFar, true);
-          }
-          if (onWord) onWord(spokenSoFar);
+      const clearStreamer = () => {
+        if (streamInterval) {
+          clearInterval(streamInterval);
+          streamInterval = null;
         }
       };
 
+      // Helper to extract a sliding window of recent 5-6 words
+      const getRecentWordsWindow = (targetIndex: number): string => {
+        const start = Math.max(0, targetIndex - 5);
+        const end = Math.min(words.length, targetIndex + 1);
+        return words.slice(start, end).join(' ');
+      };
+
+      // Real-time boundary event: display ONLY recent 5-6 words so subtitle area stays clear & uncluttered
+      utterance.onboundary = (event) => {
+        if (event.name === 'word') {
+          // Find which word index corresponds to the charIndex
+          const prefix = cleanText.substring(0, event.charIndex + (event.charLength || 4));
+          const currentCount = prefix.trim().split(/\s+/).filter(Boolean).length;
+          wordIndex = Math.max(0, currentCount - 1);
+          const currentWord = words[wordIndex] || '';
+          lipSyncManager.setWord(currentWord);
+
+          if (showSubtitles) {
+            const recentWords = getRecentWordsWindow(wordIndex);
+            notifySubtitles(recentWords, true);
+          }
+          if (onWord) onWord(getRecentWordsWindow(wordIndex));
+        }
+      };
+
+      lipSyncManager.setSpeaking(true, words[0] || '');
+
+      // Progressive streaming ticker fallback if browser boundary events are infrequent
+      if (showSubtitles && words.length > 0) {
+        // Start with first 2 words
+        notifySubtitles(words.slice(0, Math.min(3, words.length)).join(' '), true);
+        const approxWordIntervalMs = 270; // Natural pacing per word spoken
+        streamInterval = setInterval(() => {
+          if (wordIndex < words.length - 1) {
+            wordIndex += 1;
+            lipSyncManager.setWord(words[wordIndex] || '');
+            const recentWords = getRecentWordsWindow(wordIndex);
+            notifySubtitles(recentWords, true);
+          } else {
+            clearStreamer();
+          }
+        }, approxWordIntervalMs);
+      }
+
+      let fadeTimeout: any = null;
       const finishHandler = () => {
-        notifySubtitles('', false);
+        clearStreamer();
+        lipSyncManager.setSpeaking(false);
+        // Give the last 5-6 words a moment to be read, then span away automatically
+        fadeTimeout = setTimeout(() => {
+          notifySubtitles('', false);
+        }, 850);
         if (onEnd) onEnd();
       };
 
@@ -170,6 +278,7 @@ export const SpeechService = {
       window.speechSynthesis.speak(utterance);
     } catch (err) {
       console.warn('Speech synthesis error:', err);
+      lipSyncManager.setSpeaking(false);
       notifySubtitles('', false);
       if (onEnd) onEnd();
     }
@@ -178,6 +287,7 @@ export const SpeechService = {
   stopSpeaking(): void {
     if (this.isTtsSupported()) {
       window.speechSynthesis.cancel();
+      lipSyncManager.setSpeaking(false);
       notifySubtitles('', false);
     }
   },

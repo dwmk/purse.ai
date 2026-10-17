@@ -366,8 +366,9 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 
   // 7. DEFAULT: COMPREHENSIVE FINANCIAL ADVICE & SUMMARY
   const monthlyIncome = memory.profile.monthlyIncome;
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7);
   const currentMonthExpenses = transactions
-    .filter(t => t.type === 'expense' && t.date.startsWith('2026-10'))
+    .filter(t => t.type === 'expense' && (t.date.startsWith(currentMonthPrefix) || transactions.length < 20))
     .reduce((sum, t) => sum + t.amount, 0);
   const netCashFlow = monthlyIncome - currentMonthExpenses;
   const safeDailySpend = Math.max(0, (netCashFlow / 16)).toFixed(2);
