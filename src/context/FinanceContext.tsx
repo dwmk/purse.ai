@@ -85,6 +85,9 @@ interface FinanceContextType {
   importCsv: (csvStr: string) => { success: boolean; addedCount: number; message: string };
   resetAllData: () => void;
   wipeEverything: () => void;
+  addAccount: (account: Omit<Account, 'id' | 'lastUpdated'>) => void;
+  updateAccount: (id: string, updates: Partial<Omit<Account, 'id'>>) => void;
+  deleteAccount: (id: string) => void;
   isInitialized: boolean;
   showInitializationModal: boolean;
   setShowInitializationModal: (show: boolean) => void;
@@ -93,7 +96,10 @@ interface FinanceContextType {
     accountName: string,
     accountType: AccountType,
     startingBalance: number,
-    currency: string
+    currency: string,
+    institution?: string,
+    network?: string,
+    walletAddress?: string
   ) => void;
   missingApiKeyProvider: LLMProvider | null;
   setMissingApiKeyProvider: (provider: LLMProvider | null) => void;
@@ -404,16 +410,26 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     accountName: string,
     accountType: AccountType,
     startingBalance: number,
-    currency: string
+    currency: string,
+    institution?: string,
+    network?: string,
+    walletAddress?: string
   ) => {
+    const isCash = accountType === 'cash';
+    const isCrypto = accountType === 'crypto';
+    const finalInst = institution !== undefined ? institution : (isCash ? '' : (isCrypto ? 'Self-Custody' : 'Primary Bank'));
+    const finalMask = isCash ? 'Cash Drawer' : (isCrypto ? (walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : '0x...Web3') : '•••• 0001');
+
     const newAccount: Account = {
-      id: `acc_clean_${Date.now()}`,
-      name: accountName || 'Primary Checking',
-      type: accountType || 'checking',
+      id: `acc_${Date.now()}`,
+      name: accountName || (isCash ? 'Physical Cash Wallet' : isCrypto ? 'Web3 Crypto Wallet' : 'Primary Checking'),
+      type: accountType || 'cash',
       balance: startingBalance || 0,
       currency: currency || 'USD',
-      institution: 'Primary Bank',
-      accountNumberMask: '•••• 0001',
+      institution: finalInst,
+      accountNumberMask: finalMask,
+      network: isCrypto ? (network || 'Ethereum & Solana') : undefined,
+      walletAddress: isCrypto ? walletAddress : undefined,
       lastUpdated: new Date().toISOString()
     };
 
@@ -430,7 +446,54 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsInitialized(true);
     setShowInitializationModal(false);
     setCurrentView('chat');
-    showNotification('success', `Created clean account "${newAccount.name}" with $${startingBalance.toFixed(2)} balance.`);
+    showNotification('success', `Created clean ${newAccount.type.toUpperCase()} account "${newAccount.name}" with $${startingBalance.toFixed(2)} balance.`);
+  };
+
+  const addAccount = (acc: Omit<Account, 'id' | 'lastUpdated'>) => {
+    const isCash = acc.type === 'cash';
+    const isCrypto = acc.type === 'crypto';
+    const finalInst = acc.institution !== undefined ? acc.institution : (isCash ? '' : (isCrypto ? 'Self-Custody' : 'Bank'));
+    const finalMask = acc.accountNumberMask || (isCash ? 'Cash Drawer' : (isCrypto ? (acc.walletAddress ? `${acc.walletAddress.slice(0, 4)}...${acc.walletAddress.slice(-4)}` : '0x...Web3') : `•••• ${Math.floor(1000 + Math.random() * 9000)}`));
+
+    const newAcc: Account = {
+      ...acc,
+      id: `acc_${Date.now()}`,
+      institution: finalInst,
+      accountNumberMask: finalMask,
+      lastUpdated: new Date().toISOString()
+    };
+    const updated = [...accounts, newAcc];
+    setAccounts(updated);
+    StorageService.saveAccounts(updated);
+    refreshStorageUsage();
+    showNotification('success', `Added ${newAcc.type.toUpperCase()} account "${newAcc.name}" ($${newAcc.balance.toFixed(2)}).`);
+  };
+
+  const updateAccount = (id: string, updates: Partial<Omit<Account, 'id'>>) => {
+    const updated = accounts.map(a => a.id === id ? { ...a, ...updates, lastUpdated: new Date().toISOString() } : a);
+    setAccounts(updated);
+    StorageService.saveAccounts(updated);
+    refreshStorageUsage();
+    showNotification('success', 'Account updated successfully.');
+  };
+
+  const deleteAccount = (id: string) => {
+    if (accounts.length <= 1) {
+      showNotification('error', 'Cannot remove the last remaining account from your ledger.');
+      return;
+    }
+    const accToDelete = accounts.find(a => a.id === id);
+    const updated = accounts.filter(a => a.id !== id);
+    const fallbackId = updated[0]?.id;
+    if (fallbackId) {
+      const updatedTxs = transactions.map(t => t.accountId === id ? { ...t, accountId: fallbackId } : t);
+      setTransactions(updatedTxs);
+      StorageService.saveTransactions(updatedTxs);
+    }
+    setAccounts(updated);
+    StorageService.saveAccounts(updated);
+    refreshStorageUsage();
+    showNotification('info', `Removed account "${accToDelete?.name || id}".`);
   };
 
   const toggleTheme = () => {
@@ -495,21 +558,47 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const action = actions.find(a => a.id === actionId);
     if (!action || action.status !== 'pending') return;
 
-    if (action.type === 'ADD_TRANSACTION') {
+    if (action.type === 'ADD_ACCOUNT') {
+      const newAcc: Account = {
+        ...action.payload,
+        id: action.payload.id || `acc_${Date.now()}`,
+        lastUpdated: new Date().toISOString()
+      };
+      const updatedAccounts = [...accounts, newAcc];
+      setAccounts(updatedAccounts);
+      StorageService.saveAccounts(updatedAccounts);
+      showNotification('success', `Created ${newAcc.type.toUpperCase()} account "${newAcc.name}".`);
+    } else if (action.type === 'ADD_TRANSACTION') {
       const newTx: Transaction = action.payload;
       const updatedTxs = [newTx, ...transactions];
       setTransactions(updatedTxs);
       StorageService.saveTransactions(updatedTxs);
 
-      const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
-      const updatedAccounts = accounts.map(acc => {
-        if (acc.id === newTx.accountId) {
-          return { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      StorageService.saveAccounts(updatedAccounts);
+      if (newTx.type === 'transfer' && (action.payload.fromAccountId || action.payload.toAccountId)) {
+        const fromId = action.payload.fromAccountId || newTx.accountId;
+        const toId = action.payload.toAccountId;
+        const updatedAccounts = accounts.map(acc => {
+          if (acc.id === fromId) {
+            return { ...acc, balance: acc.balance - newTx.amount, lastUpdated: new Date().toISOString() };
+          }
+          if (toId && acc.id === toId) {
+            return { ...acc, balance: acc.balance + newTx.amount, lastUpdated: new Date().toISOString() };
+          }
+          return acc;
+        });
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+      } else {
+        const delta = newTx.type === 'income' ? newTx.amount : -newTx.amount;
+        const updatedAccounts = accounts.map(acc => {
+          if (acc.id === newTx.accountId) {
+            return { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() };
+          }
+          return acc;
+        });
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+      }
       showNotification('success', `Logged ${newTx.type} of $${newTx.amount.toFixed(2)}.`);
     } else if (action.type === 'ADD_BILL') {
       const newBill: Bill = action.payload;
@@ -563,21 +652,43 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const action = actions.find(a => a.id === actionId);
     if (!action || action.status !== 'applied') return;
 
-    if (action.type === 'ADD_TRANSACTION') {
+    if (action.type === 'ADD_ACCOUNT') {
+      const acc: Account = action.payload;
+      const updatedAccounts = accounts.filter(a => a.id !== acc.id);
+      setAccounts(updatedAccounts);
+      StorageService.saveAccounts(updatedAccounts);
+      showNotification('success', `Reverted creation of account "${acc.name}".`);
+    } else if (action.type === 'ADD_TRANSACTION') {
       const tx: Transaction = action.payload;
       const updatedTxs = transactions.filter(t => t.id !== tx.id);
       setTransactions(updatedTxs);
       StorageService.saveTransactions(updatedTxs);
 
-      const delta = tx.type === 'income' ? -tx.amount : tx.amount;
-      const updatedAccounts = accounts.map(acc => {
-        if (acc.id === tx.accountId) {
-          return { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() };
-        }
-        return acc;
-      });
-      setAccounts(updatedAccounts);
-      StorageService.saveAccounts(updatedAccounts);
+      if (tx.type === 'transfer' && (action.payload.fromAccountId || action.payload.toAccountId)) {
+        const fromId = action.payload.fromAccountId || tx.accountId;
+        const toId = action.payload.toAccountId;
+        const updatedAccounts = accounts.map(acc => {
+          if (acc.id === fromId) {
+            return { ...acc, balance: acc.balance + tx.amount, lastUpdated: new Date().toISOString() };
+          }
+          if (toId && acc.id === toId) {
+            return { ...acc, balance: acc.balance - tx.amount, lastUpdated: new Date().toISOString() };
+          }
+          return acc;
+        });
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+      } else {
+        const delta = tx.type === 'income' ? -tx.amount : tx.amount;
+        const updatedAccounts = accounts.map(acc => {
+          if (acc.id === tx.accountId) {
+            return { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() };
+          }
+          return acc;
+        });
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+      }
       showNotification('success', `Reverted $${tx.amount.toFixed(2)} transaction.`);
     } else if (action.type === 'ADD_BILL') {
       const bill: Bill = action.payload;
@@ -1011,6 +1122,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         rollbackAction,
         addTransaction,
         deleteTransaction,
+        addAccount,
+        updateAccount,
+        deleteAccount,
         addBill,
         updateBill,
         toggleBillPaid,

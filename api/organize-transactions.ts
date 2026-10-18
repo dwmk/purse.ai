@@ -32,12 +32,14 @@ Return ONLY a valid JSON object with the following schema (no markdown formattin
   "accounts": [
     {
       "id": "acc_primary",
-      "name": "string (e.g. Primary Checking)",
-      "type": "checking" | "savings" | "credit" | "investment",
+      "name": "string (e.g. Physical Cash Wallet, Phantom Solana, Chase Checking)",
+      "type": "cash" | "crypto" | "checking" | "savings" | "credit" | "investment",
       "balance": number,
       "currency": "USD",
-      "institution": "string (e.g. Bank)",
-      "accountNumberMask": "string (e.g. •••• 1234)"
+      "institution": "string (leave empty string \"\" for cash account with no bank specified, or bank/custodian name)",
+      "network": "optional string for crypto (e.g. Solana, Ethereum, Bitcoin)",
+      "walletAddress": "optional string for crypto",
+      "accountNumberMask": "string (e.g. Cash, Web3, •••• 1234)"
     }
   ],
   "transactions": [

@@ -41,6 +41,16 @@ const LEGACY_KEYS: Record<string, string> = {
 // Initial realistic accounts
 export const SEED_ACCOUNTS: Account[] = [
   {
+    id: 'acc_cash_01',
+    name: 'Physical Cash Wallet',
+    type: 'cash',
+    balance: 280.00,
+    currency: 'USD',
+    institution: '', // Default cash account has no bank specified
+    accountNumberMask: 'Cash Drawer',
+    lastUpdated: '2026-10-16T08:00:00Z'
+  },
+  {
     id: 'acc_chk_01',
     name: 'Primary Operating Checking',
     type: 'checking',
@@ -61,7 +71,19 @@ export const SEED_ACCOUNTS: Account[] = [
     lastUpdated: '2026-10-15T12:00:00Z'
   },
   {
-    id: 'acc_cc_03',
+    id: 'acc_crypto_03',
+    name: 'Web3 Self-Custody Wallet',
+    type: 'crypto',
+    balance: 3650.00,
+    currency: 'USD',
+    institution: 'Hardware Vault',
+    network: 'Ethereum & Solana',
+    walletAddress: '0x71C82...3A9F',
+    accountNumberMask: '0x71...3A9F',
+    lastUpdated: '2026-10-15T18:00:00Z'
+  },
+  {
+    id: 'acc_cc_04',
     name: 'Daily Cash Rewards Card',
     type: 'credit',
     balance: -842.15,
@@ -71,7 +93,7 @@ export const SEED_ACCOUNTS: Account[] = [
     lastUpdated: '2026-10-16T07:30:00Z'
   },
   {
-    id: 'acc_inv_04',
+    id: 'acc_inv_05',
     name: 'Taxable Index Portfolio',
     type: 'investment',
     balance: 28450.00,

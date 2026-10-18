@@ -19,6 +19,8 @@ export interface AgentContext {
   budgets: BudgetEnvelope[];
   memory: MemoryFile;
   config: LLMConfig;
+  theme?: 'dark' | 'light';
+  isSpeechEnabled?: boolean;
 }
 
 export interface AgentResponse {
@@ -117,11 +119,11 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
   const lower = text.toLowerCase();
   const { accounts, transactions, bills, budgets, memory } = context;
 
-  const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
+  const checkingAcc = accounts.find(a => a.type === 'checking') || accounts.find(a => a.type === 'cash') || accounts[0];
   const checkingBalance = checkingAcc?.balance || 0;
   const totalLiquid = accounts
-    .filter(a => a.type === 'checking' || a.type === 'savings')
-    .reduce((sum, a) => sum + a.balance, 0);
+    .filter(a => a.type === 'checking' || a.type === 'savings' || a.type === 'cash')
+    .reduce((sum, a) => sum + Math.max(0, a.balance), 0);
 
   // 1. INTENT: CASH RUNWAY QUERY
   if (lower.includes('runway') || lower.includes('how long can i survive') || lower.includes('survival')) {
@@ -131,8 +133,13 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
     const months = monthlyNeeds > 0 ? (totalLiquid / monthlyNeeds).toFixed(1) : '6.0';
     const days = Math.round(parseFloat(months) * 30.4);
 
+    const cashSavingsAccs = accounts.filter(a => a.type === 'savings' || a.type === 'cash');
+    const cashReserveStr = cashSavingsAccs.length > 0
+      ? ` + $${cashSavingsAccs.reduce((s, a) => s + a.balance, 0).toLocaleString()} in reserves/cash`
+      : '';
+
     return {
-      content: `### Cash Runway & Liquidity Analysis\n\nBased on your total liquid reserves of **$${totalLiquid.toLocaleString('en-US', { minimumFractionDigits: 2 })}** ($${checkingBalance.toFixed(2)} in checking + $${(accounts.find(a => a.type === 'savings')?.balance || 0).toLocaleString()} in emergency savings) and essential fixed needs of **$${monthlyNeeds.toFixed(2)}/month**:\n\n- **Zero-Income Runway:** **${months} months** (~${days} days)\n- **Operating Checking Cushion:** $${checkingBalance.toFixed(2)} (Floor: $${memory.profile.minimumCheckingFloor.toFixed(2)})\n- **Safety Invariant:** Your liquidity exceeds the minimum 3-month survival baseline of $${(monthlyNeeds * 3).toFixed(2)}.`,
+      content: `### Cash Runway & Liquidity Analysis\n\nBased on your total liquid reserves of **$${totalLiquid.toLocaleString('en-US', { minimumFractionDigits: 2 })}** ($${checkingBalance.toFixed(2)} in ${checkingAcc?.name || 'primary account'}${cashReserveStr}) and essential fixed needs of **$${monthlyNeeds.toFixed(2)}/month**:\n\n- **Zero-Income Runway:** **${months} months** (~${days} days)\n- **Operating Cushion:** $${checkingBalance.toFixed(2)} (Floor: $${memory.profile.minimumCheckingFloor.toFixed(2)})\n- **Safety Invariant:** Your liquidity exceeds the minimum 3-month survival baseline of $${(monthlyNeeds * 3).toFixed(2)}.`,
       measurableValue: `${months} Months Total Cash Runway (${days} Days)`,
       plan: {
         id: `plan_runway_${Date.now()}`,
@@ -462,15 +469,14 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
 
 // Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
 // Full-stack Agent Reasoning Dispatcher with Real-time Word Streaming
-// Parse action JSON block from LLM output to let the LLM decide transactions, bills, and memory rules accurately
+// Parse action JSON block from LLM output to let the LLM decide transactions, bills, accounts, and memory rules accurately
 export function parseAgentResponseWithActions(
   rawReply: string,
   edgePlan: AgentResponse,
   context: AgentContext,
   userInput: string
 ): AgentResponse {
-  const checkingAcc = context.accounts.find(a => a.type === 'checking') || context.accounts[0];
-  const checkingBalance = checkingAcc?.balance || 0;
+  const defaultAcc = context.accounts.find(a => a.type === 'checking') || context.accounts.find(a => a.type === 'cash') || context.accounts[0];
 
   const actionJsonMatch = rawReply.match(/```action_json\s*([\s\S]*?)\s*```/);
   if (actionJsonMatch) {
@@ -480,25 +486,56 @@ export function parseAgentResponseWithActions(
       // 1. Transaction proposal (income / expense / transfer)
       if (parsed && typeof parsed.amount === 'number' && (parsed.type || parsed.action === 'ADD_TRANSACTION')) {
         const isIncome = parsed.type === 'income';
-        const txType = isIncome ? 'income' : (parsed.type === 'transfer' ? 'transfer' : 'expense');
+        const isTransfer = parsed.type === 'transfer';
+        const txType = isIncome ? 'income' : (isTransfer ? 'transfer' : 'expense');
         const amt = Math.abs(parsed.amount);
         const category: ExpenseCategory = parsed.category || (isIncome ? 'Other' : detectCategory(userInput));
-        const merchant = parsed.merchant || (isIncome ? 'Income Source' : 'Retail Merchant');
+        const merchant = parsed.merchant || (isIncome ? 'Income Source' : (isTransfer ? 'Account Transfer' : 'Retail Merchant'));
+
+        // Resolve target account
+        let targetAccount = defaultAcc;
+        if (parsed.accountId) {
+          const found = context.accounts.find(a => a.id === parsed.accountId);
+          if (found) targetAccount = found;
+        } else if (parsed.accountName) {
+          const found = context.accounts.find(a => a.name.toLowerCase().includes(parsed.accountName.toLowerCase()));
+          if (found) targetAccount = found;
+        } else if (parsed.accountType) {
+          const found = context.accounts.find(a => a.type === parsed.accountType);
+          if (found) targetAccount = found;
+        } else {
+          const inputLower = userInput.toLowerCase();
+          if (inputLower.includes('cash') || inputLower.includes('pocket') || inputLower.includes('wallet cash')) {
+            const cashAcc = context.accounts.find(a => a.type === 'cash');
+            if (cashAcc) targetAccount = cashAcc;
+          } else if (inputLower.includes('crypto') || inputLower.includes('eth') || inputLower.includes('btc') || inputLower.includes('sol') || inputLower.includes('phantom') || inputLower.includes('metamask')) {
+            const cryptoAcc = context.accounts.find(a => a.type === 'crypto');
+            if (cryptoAcc) targetAccount = cryptoAcc;
+          } else if (inputLower.includes('checking')) {
+            const chkAcc = context.accounts.find(a => a.type === 'checking');
+            if (chkAcc) targetAccount = chkAcc;
+          } else if (inputLower.includes('savings')) {
+            const savAcc = context.accounts.find(a => a.type === 'savings');
+            if (savAcc) targetAccount = savAcc;
+          }
+        }
+
         const delta = isIncome ? amt : -amt;
-        const newBal = checkingBalance + delta;
-        const liquidityWarning = (!isIncome && newBal < context.memory.profile.minimumCheckingFloor)
-          ? `Warning: This brings checking balance ($${newBal.toFixed(2)}) below your safety floor ($${context.memory.profile.minimumCheckingFloor.toFixed(2)}).`
+        const targetBal = targetAccount?.balance || 0;
+        const newBal = targetBal + delta;
+        const liquidityWarning = (!isIncome && targetAccount?.type === 'checking' && newBal < context.memory.profile.minimumCheckingFloor)
+          ? `Warning: This brings ${targetAccount.name} balance ($${newBal.toFixed(2)}) below your safety floor ($${context.memory.profile.minimumCheckingFloor.toFixed(2)}).`
           : undefined;
 
         const newTx: Transaction = {
           id: `tx_${Date.now()}`,
-          date: new Date().toISOString().split('T')[0],
+          date: parsed.date || new Date().toISOString().split('T')[0],
           amount: amt,
           type: txType as any,
           category,
           merchant,
           note: parsed.note || userInput,
-          accountId: checkingAcc?.id || 'acc_chk_01',
+          accountId: targetAccount?.id || 'acc_primary_01',
           autoCategorized: true
         };
 
@@ -506,8 +543,12 @@ export function parseAgentResponseWithActions(
           id: `act_${Date.now()}`,
           timestamp: new Date().toISOString(),
           type: 'ADD_TRANSACTION',
-          description: `Log ${txType} of $${amt.toFixed(2)} ${isIncome ? 'from' : 'at'} ${merchant} (${category})`,
-          payload: newTx,
+          description: `Log ${txType} of $${amt.toFixed(2)} ${isIncome ? 'to' : isTransfer ? 'via' : 'from'} ${targetAccount?.name || 'Account'} (${category})`,
+          payload: {
+            ...newTx,
+            fromAccountId: parsed.fromAccountId || targetAccount?.id,
+            toAccountId: parsed.toAccountId
+          },
           status: 'pending',
           safetyLevel: amt > 250 ? 'medium_risk' : 'low_risk',
           confidenceScore: 0.98,
@@ -521,12 +562,12 @@ export function parseAgentResponseWithActions(
 
         const plan: AgentTaskPlan = {
           id: `plan_tx_${Date.now()}`,
-          intent: isIncome ? 'CONVERSATIONAL_INCOME_LOG' : 'CONVERSATIONAL_EXPENSE_LOG',
+          intent: isIncome ? 'CONVERSATIONAL_INCOME_LOG' : (isTransfer ? 'CONVERSATIONAL_TRANSFER' : 'CONVERSATIONAL_EXPENSE_LOG'),
           confidence: 0.98,
-          reasoning: `Classified ${txType} transaction of $${amt.toFixed(2)} for ${merchant}.`,
+          reasoning: `Classified ${txType} transaction of $${amt.toFixed(2)} for ${merchant} on ${targetAccount?.name || 'Account'}.`,
           steps: [
-            { step: 1, title: 'Parse Natural Language Entities', detail: `Type: ${isIncome ? 'Income (+)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
-            { step: 2, title: 'Verify Account & Balance Cushion', detail: `Projected checking balance: $${newBal.toFixed(2)}`, status: 'completed' },
+            { step: 1, title: 'Identify Target Account', detail: `${targetAccount?.name || 'Default Account'} (${targetAccount?.type?.toUpperCase() || 'CHECKING'})`, status: 'completed' },
+            { step: 2, title: 'Verify Entities & Cushion', detail: `Type: ${isIncome ? 'Income (+)' : isTransfer ? 'Transfer (⇄)' : 'Expense (-)'} · Amount: $${amt.toFixed(2)} · Category: ${category} · Source: ${merchant}`, status: 'completed' },
             { step: 3, title: 'Prepare Non-Destructive Mutation', detail: 'Awaiting user execution confirmation in Gate', status: 'in_progress' }
           ],
           proposedAction: action
@@ -537,13 +578,72 @@ export function parseAgentResponseWithActions(
           content: cleanContent,
           plan,
           action,
-          measurableValue: `${isIncome ? '+$' : '-$'}${amt.toFixed(2)} logged to ${category}`,
+          measurableValue: `${isIncome ? '+$' : '-$'}${amt.toFixed(2)} on ${targetAccount?.name || 'Account'}`,
           memoryNote: edgePlan.memoryNote,
           updatedMemory: edgePlan.updatedMemory
         };
       }
 
-      // 2. Scheduled Bill proposal
+      // 2. Add Account proposal (Crypto wallets, Cash accounts without bank, Bank accounts, etc.)
+      if (parsed && (parsed.action === 'ADD_ACCOUNT' || (parsed.name && parsed.type && ['cash', 'crypto', 'checking', 'savings', 'credit', 'investment'].includes(parsed.type)))) {
+        const accType = parsed.type;
+        const accName = parsed.name || (accType === 'cash' ? 'Cash Wallet' : accType === 'crypto' ? 'Web3 Crypto Wallet' : 'New Bank Account');
+        const initialBal = typeof parsed.balance === 'number' ? parsed.balance : (parseFloat(parsed.balance) || 0);
+        const institution = parsed.institution !== undefined ? parsed.institution : (accType === 'cash' ? '' : 'Bank');
+        const network = parsed.network || (accType === 'crypto' ? 'Ethereum & Solana' : undefined);
+        const walletAddress = parsed.walletAddress || undefined;
+
+        const newAccount: Account = {
+          id: `acc_${Date.now()}`,
+          name: accName,
+          type: accType,
+          balance: initialBal,
+          currency: parsed.currency || 'USD',
+          institution,
+          network,
+          walletAddress,
+          accountNumberMask: parsed.accountNumberMask || (accType === 'cash' ? 'Cash' : (accType === 'crypto' ? (walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : '0x...Web3') : `•••• ${Math.floor(1000 + Math.random() * 9000)}`)),
+          lastUpdated: new Date().toISOString()
+        };
+
+        const action: AgentAction = {
+          id: `act_acc_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'ADD_ACCOUNT',
+          description: `Create new ${accType.toUpperCase()} account: "${accName}" with $${initialBal.toFixed(2)} balance${institution ? ` (${institution})` : ' (No bank specified)'}`,
+          payload: newAccount,
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98,
+          dryRunImpact: {
+            balanceDelta: initialBal,
+            categoryImpact: 'Accounts'
+          }
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_acc_${Date.now()}`,
+          intent: 'CREATE_ACCOUNT',
+          confidence: 0.98,
+          reasoning: `Prepared new ${accType} account "${accName}".`,
+          steps: [
+            { step: 1, title: 'Configure Account Metadata', detail: `Type: ${accType.toUpperCase()} · Name: ${accName} · Bank: ${institution || 'None (Cash)'}`, status: 'completed' },
+            { step: 2, title: 'Set Initial Reserve', detail: `$${initialBal.toFixed(2)} initial balance`, status: 'completed' },
+            { step: 3, title: 'Await User Confirmation', detail: 'Ready for commit to local storage', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return {
+          content: cleanContent,
+          plan,
+          action,
+          measurableValue: `New ${accType} account: ${accName}`
+        };
+      }
+
+      // 3. Scheduled Bill proposal
       if (parsed && (parsed.action === 'ADD_BILL' || (parsed.name && parsed.dueDate && typeof parsed.amount === 'number'))) {
         const billAmt = Math.abs(parsed.amount);
         const billName = parsed.name || 'New Recurring Bill';
@@ -600,7 +700,7 @@ export function parseAgentResponseWithActions(
         };
       }
 
-      // 3. Memory Invariant Update proposal
+      // 4. Memory Invariant Update proposal
       if (parsed && (parsed.action === 'UPDATE_MEMORY' || (parsed.rule && typeof parsed.rule === 'string'))) {
         const newRule = (parsed.rule as string).trim();
         if (newRule.length > 3) {
@@ -649,6 +749,353 @@ export function parseAgentResponseWithActions(
           };
         }
       }
+
+      // 5. Update Account proposal
+      if (parsed && (parsed.action === 'UPDATE_ACCOUNT' || parsed.action === 'EDIT_ACCOUNT')) {
+        const accId = parsed.accountId || parsed.id;
+        const target = context.accounts.find(a => a.id === accId) || context.accounts.find(a => a.name.toLowerCase().includes(String(parsed.accountName || '').toLowerCase())) || defaultAcc;
+        const updates: Partial<Account> = {};
+        if (typeof parsed.balance === 'number') updates.balance = parsed.balance;
+        if (parsed.name) updates.name = parsed.name;
+        if (parsed.institution !== undefined) updates.institution = parsed.institution;
+        if (parsed.network) updates.network = parsed.network;
+        if (parsed.currency) updates.currency = parsed.currency;
+
+        const updateDetails = Object.entries(updates).map(([k, v]) => `${k} → ${v}`).join(', ');
+        const action: AgentAction = {
+          id: `act_edit_acc_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'EDIT_ACCOUNT',
+          description: `Update account "${target?.name || 'Account'}": ${updateDetails}`,
+          payload: { id: target?.id, updates, previous: target },
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_edit_acc_${Date.now()}`,
+          intent: 'UPDATE_ACCOUNT',
+          confidence: 0.98,
+          reasoning: `Prepared account update for ${target?.name}.`,
+          steps: [
+            { step: 1, title: 'Locate Account', detail: `${target?.name} (${target?.id})`, status: 'completed' },
+            { step: 2, title: 'Verify Updates', detail: updateDetails, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return { content: cleanContent, plan, action, measurableValue: `Update ${target?.name}` };
+      }
+
+      // 6. Delete Account proposal
+      if (parsed && parsed.action === 'DELETE_ACCOUNT') {
+        const accId = parsed.accountId || parsed.id;
+        const target = context.accounts.find(a => a.id === accId) || context.accounts.find(a => a.name.toLowerCase().includes(String(parsed.accountName || '').toLowerCase()));
+        if (target) {
+          const action: AgentAction = {
+            id: `act_del_acc_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'DELETE_ACCOUNT',
+            description: `Delete account "${target.name}" (${target.type.toUpperCase()}) with balance $${target.balance.toFixed(2)}`,
+            payload: target,
+            status: 'pending',
+            safetyLevel: 'medium_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_del_acc_${Date.now()}`,
+            intent: 'DELETE_ACCOUNT',
+            confidence: 0.98,
+            reasoning: `Prepared account deletion for ${target.name}.`,
+            steps: [
+              { step: 1, title: 'Verify Account', detail: `${target.name} (${target.id})`, status: 'completed' },
+              { step: 2, title: 'Preserve Balance Records', detail: 'Transactions remapped to remaining primary account', status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, measurableValue: `Remove ${target.name}` };
+        }
+      }
+
+      // 7. Update Budget proposal
+      if (parsed && (parsed.action === 'UPDATE_BUDGET' || (parsed.category && typeof parsed.allocated === 'number' && !parsed.amount))) {
+        const catName = parsed.category;
+        const existing = context.budgets.find(b => b.category.toLowerCase() === String(catName).toLowerCase() || b.id === parsed.budgetId);
+        const newAlloc = Math.abs(parsed.allocated);
+
+        const action: AgentAction = {
+          id: `act_bud_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'UPDATE_BUDGET',
+          description: `Update "${existing?.category || catName}" budget envelope to $${newAlloc.toFixed(2)}/mo`,
+          payload: { id: existing?.id, category: existing?.category || catName, allocated: newAlloc, previousAllocated: existing?.allocated },
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_bud_${Date.now()}`,
+          intent: 'UPDATE_BUDGET',
+          confidence: 0.98,
+          reasoning: `Updated budget envelope allocation for ${existing?.category || catName}.`,
+          steps: [
+            { step: 1, title: 'Identify Envelope', detail: existing?.category || catName, status: 'completed' },
+            { step: 2, title: 'Recalculate Headroom', detail: `Allocation: $${existing?.allocated?.toFixed(2) || '0.00'} → $${newAlloc.toFixed(2)}`, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return { content: cleanContent, plan, action, measurableValue: `Budget: ${existing?.category || catName} → $${newAlloc.toFixed(2)}` };
+      }
+
+      // 8. Add Budget proposal
+      if (parsed && parsed.action === 'ADD_BUDGET') {
+        const newBudget: BudgetEnvelope = {
+          id: `b_${Date.now()}`,
+          category: parsed.category || 'Other',
+          type: parsed.type || 'want',
+          allocated: Math.abs(parsed.allocated || 100),
+          color: parsed.color || '#B59DD1'
+        };
+
+        const action: AgentAction = {
+          id: `act_add_bud_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'ADD_BUDGET',
+          description: `Add new "${newBudget.category}" envelope ($${newBudget.allocated.toFixed(2)}/mo, ${newBudget.type})`,
+          payload: newBudget,
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_add_bud_${Date.now()}`,
+          intent: 'ADD_BUDGET',
+          confidence: 0.98,
+          reasoning: `Created new envelope for ${newBudget.category}.`,
+          steps: [
+            { step: 1, title: 'Envelope Definition', detail: `${newBudget.category} · $${newBudget.allocated.toFixed(2)}`, status: 'completed' },
+            { step: 2, title: 'Category Classification', detail: `Type: ${newBudget.type}`, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return { content: cleanContent, plan, action, measurableValue: `New envelope: ${newBudget.category}` };
+      }
+
+      // 9. Delete Budget proposal
+      if (parsed && parsed.action === 'DELETE_BUDGET') {
+        const existing = context.budgets.find(b => b.id === parsed.budgetId || b.category.toLowerCase().includes(String(parsed.category || '').toLowerCase()));
+        if (existing) {
+          const action: AgentAction = {
+            id: `act_del_bud_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'DELETE_BUDGET',
+            description: `Delete budget envelope "${existing.category}" ($${existing.allocated.toFixed(2)}/mo)`,
+            payload: existing,
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_del_bud_${Date.now()}`,
+            intent: 'DELETE_BUDGET',
+            confidence: 0.98,
+            reasoning: `Removed envelope ${existing.category}.`,
+            steps: [
+              { step: 1, title: 'Identify Envelope', detail: existing.category, status: 'completed' },
+              { step: 2, title: 'Check Unallocated Overflow', detail: 'Spend falls back to General Ledger', status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, measurableValue: `Delete envelope: ${existing.category}` };
+        }
+      }
+
+      // 10. Update or Pay Bill proposal
+      if (parsed && (parsed.action === 'UPDATE_BILL' || parsed.action === 'EDIT_BILL' || parsed.action === 'PAY_BILL')) {
+        const isPay = parsed.action === 'PAY_BILL' || parsed.status === 'paid' || parsed.isPaidThisCycle === true;
+        const existing = context.bills.find(b => b.id === parsed.billId || b.name.toLowerCase().includes(String(parsed.name || parsed.billName || '').toLowerCase()));
+        const updates: Partial<Bill> = {};
+        if (typeof parsed.amount === 'number') updates.amount = Math.abs(parsed.amount);
+        if (parsed.dueDate) updates.dueDate = parsed.dueDate;
+        if (parsed.isAutopay !== undefined) updates.isAutopay = Boolean(parsed.isAutopay);
+        if (isPay) {
+          updates.isPaidThisCycle = true;
+          updates.status = 'paid';
+        }
+
+        const action: AgentAction = {
+          id: `act_edit_bill_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: isPay ? 'PAY_BILL' : 'EDIT_BILL',
+          description: isPay
+            ? `Mark recurring bill "${existing?.name || parsed.name}" ($${existing?.amount.toFixed(2) || ''}) as paid for this cycle`
+            : `Update recurring bill "${existing?.name || parsed.name}"`,
+          payload: { id: existing?.id || parsed.billId, updates, previous: existing },
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_edit_bill_${Date.now()}`,
+          intent: isPay ? 'PAY_BILL' : 'UPDATE_BILL',
+          confidence: 0.98,
+          reasoning: isPay ? `Marked bill ${existing?.name || parsed.name} as paid.` : `Updated bill ${existing?.name || parsed.name}.`,
+          steps: [
+            { step: 1, title: 'Identify Bill', detail: existing?.name || parsed.name, status: 'completed' },
+            { step: 2, title: 'Apply Status Update', detail: isPay ? 'Status: PAID' : JSON.stringify(updates), status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return { content: cleanContent, plan, action, measurableValue: isPay ? `Paid: ${existing?.name || parsed.name}` : `Update: ${existing?.name || parsed.name}` };
+      }
+
+      // 11. Delete Bill proposal
+      if (parsed && parsed.action === 'DELETE_BILL') {
+        const existing = context.bills.find(b => b.id === parsed.billId || b.name.toLowerCase().includes(String(parsed.name || parsed.billName || '').toLowerCase()));
+        if (existing) {
+          const action: AgentAction = {
+            id: `act_del_bill_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'DELETE_BILL',
+            description: `Delete recurring bill "${existing.name}" ($${existing.amount.toFixed(2)}/mo)`,
+            payload: existing,
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_del_bill_${Date.now()}`,
+            intent: 'DELETE_BILL',
+            confidence: 0.98,
+            reasoning: `Removed bill ${existing.name}.`,
+            steps: [
+              { step: 1, title: 'Locate Bill', detail: `${existing.name} ($${existing.amount.toFixed(2)})`, status: 'completed' },
+              { step: 2, title: 'Update Recurring Cashflow', detail: 'Removed from upcoming commitments', status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, measurableValue: `Deleted: ${existing.name}` };
+        }
+      }
+
+      // 12. Delete Memory Rule proposal
+      if (parsed && parsed.action === 'DELETE_MEMORY_RULE') {
+        const ruleIdx = typeof parsed.ruleIndex === 'number'
+          ? parsed.ruleIndex
+          : context.memory.rules.findIndex(r => r.toLowerCase().includes(String(parsed.rule || '').toLowerCase()));
+
+        if (ruleIdx >= 0 && ruleIdx < context.memory.rules.length) {
+          const removedRule = context.memory.rules[ruleIdx];
+          const updatedRules = context.memory.rules.filter((_, idx) => idx !== ruleIdx);
+          const updatedMarkdown = `${context.memory.rawMarkdown}\n- REMOVED_RULE: ${removedRule} (Cleared ${new Date().toISOString().split('T')[0]})`;
+          const updatedMem: MemoryFile = {
+            ...context.memory,
+            rules: updatedRules,
+            rawMarkdown: updatedMarkdown,
+            lastUpdated: new Date().toISOString(),
+            revisionCount: context.memory.revisionCount + 1
+          };
+
+          const action: AgentAction = {
+            id: `act_del_mem_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'DELETE_MEMORY_RULE',
+            description: `Remove operational rule from Memory: "${removedRule}"`,
+            payload: updatedMem,
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_del_mem_${Date.now()}`,
+            intent: 'DELETE_MEMORY_RULE',
+            confidence: 0.98,
+            reasoning: `Removed rule from memory graph.`,
+            steps: [
+              { step: 1, title: 'Locate Rule', detail: removedRule, status: 'completed' },
+              { step: 2, title: 'Compile Memory Revision', detail: `Revision #${updatedMem.revisionCount}`, status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, updatedMemory: updatedMem, memoryNote: `Removed rule: "${removedRule}"`, measurableValue: 'Memory Rule Cleared' };
+        }
+      }
+
+      // 13. Update Settings proposal
+      if (parsed && parsed.action === 'UPDATE_SETTINGS') {
+        const settingsPayload: { theme?: 'light' | 'dark'; isSpeechEnabled?: boolean; currency?: string; provider?: LLMProvider; model?: string } = {};
+        if (parsed.theme === 'light' || parsed.theme === 'dark') settingsPayload.theme = parsed.theme;
+        if (typeof parsed.isSpeechEnabled === 'boolean') settingsPayload.isSpeechEnabled = parsed.isSpeechEnabled;
+        if (typeof parsed.speech === 'boolean') settingsPayload.isSpeechEnabled = parsed.speech;
+        if (parsed.currency) settingsPayload.currency = parsed.currency;
+        if (parsed.provider) settingsPayload.provider = parsed.provider;
+        if (parsed.model) settingsPayload.model = parsed.model;
+
+        const desc = [
+          settingsPayload.theme ? `Set theme to ${settingsPayload.theme.toUpperCase()}` : null,
+          settingsPayload.isSpeechEnabled !== undefined ? (settingsPayload.isSpeechEnabled ? 'Enable voice speech' : 'Mute voice speech') : null,
+          settingsPayload.currency ? `Set primary currency to ${settingsPayload.currency}` : null,
+          settingsPayload.provider ? `Set AI model provider to ${settingsPayload.provider}` : null
+        ].filter(Boolean).join(', ');
+
+        const action: AgentAction = {
+          id: `act_settings_${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          type: 'UPDATE_SETTINGS',
+          description: desc || 'Update application settings',
+          payload: settingsPayload,
+          status: 'pending',
+          safetyLevel: 'low_risk',
+          confidenceScore: 0.98
+        };
+
+        const plan: AgentTaskPlan = {
+          id: `plan_settings_${Date.now()}`,
+          intent: 'UPDATE_SETTINGS',
+          confidence: 0.98,
+          reasoning: `Prepared application settings update.`,
+          steps: [
+            { step: 1, title: 'Parse Settings Parameters', detail: desc, status: 'completed' },
+            { step: 2, title: 'Stage Preference Mutation', detail: 'Ready for client persistence', status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        };
+
+        const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+        return { content: cleanContent, plan, action, measurableValue: desc };
+      }
     } catch (e) {
       console.warn('Action JSON parsing warning:', e);
     }
@@ -656,20 +1103,8 @@ export function parseAgentResponseWithActions(
 
   const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
 
-  // If user clearly intended a financial transaction/bill and edgePlan generated a safe action proposal, attach it
-  const isExplicitFinancialIntent = edgePlan.action && (edgePlan.action.type === 'ADD_TRANSACTION' || edgePlan.action.type === 'ADD_BILL');
-  if (isExplicitFinancialIntent) {
-    return {
-      content: cleanContent || edgePlan.content,
-      plan: edgePlan.plan,
-      action: edgePlan.action,
-      measurableValue: edgePlan.measurableValue,
-      memoryNote: edgePlan.memoryNote,
-      updatedMemory: edgePlan.updatedMemory
-    };
-  }
-
-  // Pure conversational or generic answer (e.g. BRAC university, general knowledge, greetings, analysis)
+  // If the LLM did not output an action_json block, it decided that NO account mutation was intended.
+  // Return the pure conversational or generic answer (e.g. general knowledge, BRAC university, advice, greetings) directly!
   return {
     content: cleanContent || rawReply
   };
@@ -710,8 +1145,18 @@ export async function processAgentMessage(
 
   // 1. Retrieve top semantically relevant chunks from local browser vector database
   const ragContext = vectorDb.buildRagContext(userInput, 4);
-  const checkingAcc = accounts.find(a => a.type === 'checking') || accounts[0];
-  const savingsAcc = accounts.find(a => a.type === 'savings');
+
+  // Format accounts overview with Cash, Crypto, Banks, etc.
+  const accountsOverview = accounts.map(a => {
+    const bankDesc = a.institution ? `Bank/Custodian: ${a.institution}` : 'No bank specified (Physical/Unbanked Cash)';
+    const networkDesc = a.network ? `, Network: ${a.network}` : '';
+    const maskDesc = a.accountNumberMask ? `, Mask: ${a.accountNumberMask}` : '';
+    return `- [${a.id}] "${a.name}" | Type: ${a.type} | Balance: $${a.balance.toFixed(2)} | ${bankDesc}${networkDesc}${maskDesc}`;
+  }).join('\n');
+
+  const totalLiquid = accounts
+    .filter(a => a.type === 'checking' || a.type === 'savings' || a.type === 'cash')
+    .reduce((sum, a) => sum + Math.max(0, a.balance), 0);
 
   // 2. Personal, human secretary system prompt with thorough general knowledge and accurate financial actions
   const systemPrompt = `You are Fiona, the user's friendly, sharp, knowledgeable personal finance secretary, accountant, and intelligent companion.
@@ -724,52 +1169,73 @@ ${ragContext || '[No specific historical vector chunks matched]'}
 ACTIVE AGENT KNOWLEDGE GRAPH (Memory):
 ${memory.rawMarkdown}
 
-QUICK LEDGER SNAPSHOT:
-- Checking Balance: $${(checkingAcc?.balance || 0).toFixed(2)}
-- Total Savings Vault: $${(savingsAcc?.balance || 0).toFixed(2)}
+ACCOUNTS CURRENTLY IN LEDGER:
+${accountsOverview || '[No accounts configured yet]'}
+
+LIQUIDITY & BUDGET SUMMARY:
+- Total Liquid Cash & Checking: $${totalLiquid.toFixed(2)}
 - Envelopes: ${budgets.map(b => `${b.category} ($${b.allocated}/mo)`).join(', ')}
-- Upcoming Bills: ${bills.slice(0, 4).map(b => `${b.name} ($${b.amount} on ${b.dueDate})`).join(', ')}
+- Upcoming Bills: ${bills.slice(0, 5).map(b => `${b.name} ($${b.amount} on ${b.dueDate})`).join(', ')}
 
 CORE PERSONALITY & COMMUNICATION GUIDELINES:
 1. ACT LIKE A GENUINE INTELLIGENT PERSONAL SECRETARY (FIONA):
    - Be warm, attentive, conversational, witty, and helpful. You are a trusted human-like confidante, NOT a rigid corporate template or robot.
-   - For generic questions, general queries, small talk, questions about institutions, universities (e.g. "do you know about BRAC university?"), science, geography, culture, language, or general advice:
+   - For generic questions, general queries, small talk, questions about institutions, universities (e.g. "do you know about BRAC university?"), science, geography, culture, history, programming, writing, or general advice:
      ANSWER DIRECTLY, KNOWLEDGEABLY, ACCURATELY, AND THOROUGHLY as Fiona. Do NOT deflect, do NOT give canned account status summaries, and do NOT force the conversation back to bank balances when the user is asking about an external topic.
    - For simple greetings and casual banter ("hey", "how are you?", "hello"), reply in 1 to 2 warm, natural sentences.
 
-2. FINANCIAL DECISION-MAKING & BOOKKEEPING:
-   - When the user mentions finding, receiving, earning, gaining, or spending money:
-     * Accurately classify the transaction:
-       - "income": finding money (e.g. "i found $10 on the floor"), gifts, bonuses, salary, client fees, selling items, dividends, cashback. Finding cash MUST ALWAYS be classified as income (+).
-       - "expense": buying items, paying for meals, groceries, bills, fuel, subscriptions (-).
-       - "transfer": moving money between accounts.
-     * When proposing a transaction, explain the impact and append this exact action_json block at the very end:
+2. AUTONOMOUS ACCOUNT & LEDGER OPERATIONS:
+   - You must evaluate whether the user's message is an instruction to OPERATE on their accounts or ledger data (e.g., logging income, recording an expense, transferring money, creating a crypto wallet, setting up an unbanked cash account, scheduling a bill, or saving a memory rule).
+   - If they ARE asking to operate on accounts or data, decide which account to operate on based on the context:
+     * Cash account: for physical cash, cash found, cash pocket, cash payments without a bank (e.g. acc_cash_01).
+     * Crypto wallet: for crypto tokens, web3, ETH, BTC, SOL, hardware wallets, on-chain transfers (e.g. acc_crypto_03).
+     * Bank checking, savings, credit cards, or investments: for their respective accounts.
+     * New Account Creation: If the user asks to add an account (e.g. "Add a crypto wallet for Phantom", "Create a cash jar account with $50", "Add my Chase savings"):
+       Emit an ADD_ACCOUNT action!
+     * When proposing an operation, explain what you are doing in your response, and append this exact action_json block at the very end:
+
+   For Transactions:
 \`\`\`action_json
 {
   "action": "ADD_TRANSACTION",
   "type": "income" | "expense" | "transfer",
   "amount": number,
+  "accountId": "string (the target account ID, e.g. acc_cash_01, acc_chk_01, acc_crypto_03)",
+  "fromAccountId": "string (optional for transfers)",
+  "toAccountId": "string (optional for transfers)",
   "category": "Groceries" | "Dining & Nightlife" | "Transportation & Fuel" | "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Health & Wellness" | "Entertainment & Leisure" | "Shopping & Goods" | "Savings & Investments" | "Other",
   "merchant": "string",
   "note": "string"
 }
 \`\`\`
 
-3. BILL & RECURRING MANAGEMENT:
-   - If the user wants to add or schedule a recurring bill, explain the cashflow impact and append:
+   For Creating Accounts (Crypto wallet, Cash account, Bank account, etc.):
+\`\`\`action_json
+{
+  "action": "ADD_ACCOUNT",
+  "name": "string (e.g. Phantom Crypto Wallet, Cash Pocket, Chase Checking)",
+  "type": "cash" | "crypto" | "checking" | "savings" | "credit" | "investment",
+  "balance": number,
+  "currency": "USD",
+  "institution": "string (leave empty string \"\" for cash accounts with no bank specified, or specify bank/wallet e.g. MetaMask, Chase)",
+  "network": "string (optional for crypto e.g. Solana, Ethereum, Bitcoin)",
+  "walletAddress": "string (optional for crypto e.g. 0x...)"
+}
+\`\`\`
+
+   For Scheduling Bills:
 \`\`\`action_json
 {
   "action": "ADD_BILL",
   "name": "string",
   "amount": number,
-  "category": "Groceries" | "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Transportation & Fuel" | "Health & Wellness" | "Other",
+  "category": "Subscriptions & Software" | "Utilities & Services" | "Housing & Rent" | "Other",
   "dueDate": "YYYY-MM-DD",
   "isAutopay": boolean
 }
 \`\`\`
 
-4. MEMORY & RULE LEARNING:
-   - If the user tells you a financial rule or preference to remember:
+   For Memory Rules:
 \`\`\`action_json
 {
   "action": "UPDATE_MEMORY",
@@ -777,8 +1243,8 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 }
 \`\`\`
 
-5. NO ACTION FOR NON-TRANSACTIONAL QUESTIONS:
-   - If the user is asking a general question, learning something, or chatting without requesting a financial transaction, DO NOT output any action_json block.`;
+3. CRITICAL: NO ACTION FOR NON-TRANSACTIONAL QUERIES:
+   - If the user is asking a general knowledge question, learning something, asking about a university, discussing hypothetical math, or chatting without requesting a financial transaction, DO NOT output any action_json block.`;
 
   // If local edge engine (Chrome Prompt API / Transformers.js) is explicitly active, try it first
   if (config.provider === 'edge') {

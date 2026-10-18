@@ -301,11 +301,11 @@ export const AgentChatView: React.FC = () => {
 
   const quickPrompts = [
     'How are my finances looking today?',
-    'Can I afford to make a discretionary purchase?',
-    'Log an expense to my ledger',
-    'Calculate my zero-income cash runway',
-    'Audit recurring subscriptions for leaks',
-    'Review my envelope budgets'
+    'What are my current balances from all my accounts?',
+    'Do I have any upcoming bills?',
+    'Review my monthly budget envelopes',
+    'What do you know about me so far?',
+    'What can you help me with?'
   ];
 
   const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];
@@ -443,24 +443,33 @@ export const AgentChatView: React.FC = () => {
 
                     {/* Safe Execution Proposal Gate Card */}
                     {/* Safe Execution Proposal Gate Card */}
+                    {/* Safe Execution Proposal Gate Card */}
                     {msg.action && (() => {
                       const isTx = msg.action.type === 'ADD_TRANSACTION';
                       const isIncome = isTx && msg.action.payload?.type === 'income';
                       const isExpense = isTx && msg.action.payload?.type === 'expense';
+                      const isTransfer = isTx && msg.action.payload?.type === 'transfer';
+                      const isAcc = msg.action.type === 'ADD_ACCOUNT';
+                      const isBill = msg.action.type === 'ADD_BILL';
+                      const isMem = msg.action.type === 'UPDATE_MEMORY';
                       const txAmount = isTx ? msg.action.payload?.amount : null;
 
                       return (
                         <div className={`mt-3.5 p-4 rounded-xl border font-mono text-xs space-y-2.5 ${
                           isIncome
                             ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60'
+                            : isAcc
+                            ? 'bg-blue-50/60 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800/60'
+                            : isTransfer
+                            ? 'bg-cyan-50/60 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-800/60'
                             : 'bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
                         }`}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1.5 font-bold text-zinc-900 dark:text-zinc-100">
-                              <ShieldCheck className={`w-4 h-4 ${isIncome ? 'text-emerald-500' : 'text-violet-500'}`} />
+                              <ShieldCheck className={`w-4 h-4 ${isIncome ? 'text-emerald-500' : isAcc ? 'text-blue-500' : isTransfer ? 'text-cyan-500' : 'text-violet-500'}`} />
                               <span>Execution Gate</span>
                             </div>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                               {isIncome && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                                   INCOME PROPOSAL
@@ -469,6 +478,21 @@ export const AgentChatView: React.FC = () => {
                               {isExpense && (
                                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                                   EXPENSE PROPOSAL
+                                </span>
+                              )}
+                              {isTransfer && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-cyan-100 text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800">
+                                  TRANSFER PROPOSAL
+                                </span>
+                              )}
+                              {isAcc && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                  ACCOUNT CREATION
+                                </span>
+                              )}
+                              {isBill && (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                                  SCHEDULE BILL
                                 </span>
                               )}
                               <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-violet-100 text-violet-700 dark:bg-violet-950/80 dark:text-violet-300">
@@ -480,8 +504,19 @@ export const AgentChatView: React.FC = () => {
                           <div className="text-zinc-800 dark:text-zinc-200 text-xs font-sans flex items-start gap-2">
                             {isIncome && <span className="text-emerald-600 dark:text-emerald-400 font-bold font-mono">+{txAmount ? `$${txAmount.toFixed(2)}` : ''}</span>}
                             {isExpense && <span className="text-rose-600 dark:text-rose-400 font-bold font-mono">-{txAmount ? `$${txAmount.toFixed(2)}` : ''}</span>}
+                            {isTransfer && <span className="text-cyan-600 dark:text-cyan-400 font-bold font-mono">⇄{txAmount ? `$${txAmount.toFixed(2)}` : ''}</span>}
                             <span>{msg.action.description}</span>
                           </div>
+
+                          {/* Show Account Details for ADD_ACCOUNT */}
+                          {isAcc && msg.action.payload && (
+                            <div className="p-2.5 bg-white dark:bg-zinc-850 rounded-lg border border-zinc-200 dark:border-zinc-700 text-[11px] space-y-1">
+                              <div><strong>Account:</strong> {msg.action.payload.name} ({msg.action.payload.type.toUpperCase()})</div>
+                              <div><strong>Bank / Custodian:</strong> {msg.action.payload.institution || 'No bank specified (Physical/Unbanked Cash)'}</div>
+                              {msg.action.payload.network && <div><strong>Network:</strong> {msg.action.payload.network}</div>}
+                              <div><strong>Starting Balance:</strong> ${Number(msg.action.payload.balance || 0).toFixed(2)} {msg.action.payload.currency || 'USD'}</div>
+                            </div>
+                          )}
 
                           {msg.action.dryRunImpact?.liquidityWarning && (
                             <div className="flex items-center gap-1.5 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-lg text-[11px] text-amber-800 dark:text-amber-300 font-medium">
@@ -499,6 +534,10 @@ export const AgentChatView: React.FC = () => {
                                   className={`flex-1 py-2 font-semibold rounded-lg text-xs transition-colors tactile-btn cursor-pointer shadow-xs text-white ${
                                     isIncome
                                       ? 'bg-emerald-600 hover:bg-emerald-700'
+                                      : isAcc
+                                      ? 'bg-blue-600 hover:bg-blue-700'
+                                      : isTransfer
+                                      ? 'bg-cyan-600 hover:bg-cyan-700'
                                       : 'bg-violet-600 hover:bg-violet-700'
                                   }`}
                                 >
@@ -506,6 +545,10 @@ export const AgentChatView: React.FC = () => {
                                     ? `Approve & Record Income (+$${txAmount?.toFixed(2) || ''})`
                                     : isExpense
                                     ? `Approve & Record Expense (-$${txAmount?.toFixed(2) || ''})`
+                                    : isTransfer
+                                    ? `Approve & Transfer ($${txAmount?.toFixed(2) || ''})`
+                                    : isAcc
+                                    ? `Approve & Create ${msg.action.payload?.type?.toUpperCase()} Account`
                                     : 'Approve & Record'}
                                 </button>
                                 <button
@@ -584,21 +627,6 @@ export const AgentChatView: React.FC = () => {
 
             <div ref={messagesEndRef} />
           </div>
-
-          {/* Quick Prompts Strip - Only show when no messages are shown yet */}
-          {chatMessages.length === 0 && (
-            <div className="py-2 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
-              {quickPrompts.map(p => (
-                <button
-                  key={p}
-                  onClick={() => sendMessage(p)}
-                  className="text-[11px] font-mono px-3.5 py-1.5 bg-white dark:bg-[#121216] text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-800 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 rounded-full transition-all whitespace-nowrap shrink-0 cursor-pointer shadow-xs active:scale-95"
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
         </>
       )}
 

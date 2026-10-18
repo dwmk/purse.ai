@@ -26,7 +26,7 @@ export interface Transaction {
   autoCategorized?: boolean;
 }
 
-export type AccountType = 'checking' | 'savings' | 'credit' | 'investment';
+export type AccountType = 'cash' | 'crypto' | 'checking' | 'savings' | 'credit' | 'investment';
 
 export interface Account {
   id: string;
@@ -34,8 +34,10 @@ export interface Account {
   type: AccountType;
   balance: number;
   currency: string;
-  institution: string;
-  accountNumberMask: string;
+  institution?: string; // Optional: empty or unspecified for cash accounts without a bank
+  accountNumberMask?: string;
+  walletAddress?: string; // For crypto wallets
+  network?: string; // e.g. Ethereum, Solana, Bitcoin, Polygon
   lastUpdated: string;
 }
 
@@ -68,11 +70,19 @@ export type ActionType =
   | 'ADD_TRANSACTION'
   | 'EDIT_TRANSACTION'
   | 'DELETE_TRANSACTION'
+  | 'ADD_ACCOUNT'
+  | 'EDIT_ACCOUNT'
+  | 'DELETE_ACCOUNT'
   | 'ADD_BILL'
   | 'EDIT_BILL'
   | 'PAY_BILL'
+  | 'DELETE_BILL'
+  | 'ADD_BUDGET'
   | 'UPDATE_BUDGET'
+  | 'DELETE_BUDGET'
   | 'UPDATE_MEMORY'
+  | 'DELETE_MEMORY_RULE'
+  | 'UPDATE_SETTINGS'
   | 'ALLOCATE_SAVINGS';
 
 export interface AgentAction {

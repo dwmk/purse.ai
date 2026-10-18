@@ -219,12 +219,14 @@ export const IngestionService = {
           const rawOrg = data.organized;
           const accounts: Account[] = (rawOrg.accounts && rawOrg.accounts.length > 0) ? rawOrg.accounts.map((a: any, idx: number) => ({
             id: a.id || `acc_${idx + 1}`,
-            name: a.name || 'Primary Checking',
+            name: a.name || (a.type === 'cash' ? 'Cash Wallet' : a.type === 'crypto' ? 'Crypto Wallet' : 'Primary Checking'),
             type: a.type || 'checking',
             balance: typeof a.balance === 'number' ? a.balance : 0,
             currency: a.currency || 'USD',
-            institution: a.institution || 'Bank',
-            accountNumberMask: a.accountNumberMask || '•••• 1234',
+            institution: a.institution ?? (a.type === 'cash' ? '' : a.type === 'crypto' ? 'Self-Custody' : 'Bank'),
+            network: a.network,
+            walletAddress: a.walletAddress,
+            accountNumberMask: a.accountNumberMask || (a.type === 'cash' ? 'Cash' : a.type === 'crypto' ? 'Web3' : '•••• 1234'),
             lastUpdated: new Date().toISOString()
           })) : [
             {

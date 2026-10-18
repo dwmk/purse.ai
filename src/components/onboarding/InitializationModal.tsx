@@ -60,12 +60,14 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
   const [parseError, setParseError] = useState<string>('');
   const [organizedResult, setOrganizedResult] = useState<OrganizedIngestionResult | null>(null);
 
-  // Blank account form states
-  const [blankAccountName, setBlankAccountName] = useState<string>('Primary Checking');
-  const [blankAccountType, setBlankAccountType] = useState<AccountType>('checking');
+  // Blank account form states (default is cash account with no bank specified)
+  const [blankAccountName, setBlankAccountName] = useState<string>('Physical Cash Wallet');
+  const [blankAccountType, setBlankAccountType] = useState<AccountType>('cash');
   const [blankBalance, setBlankBalance] = useState<string>('0.00');
   const [blankCurrency, setBlankCurrency] = useState<string>('USD');
-  const [blankInstitution, setBlankInstitution] = useState<string>('Local Bank');
+  const [blankInstitution, setBlankInstitution] = useState<string>(''); // No bank specified for cash
+  const [blankNetwork, setBlankNetwork] = useState<string>('Ethereum & Solana');
+  const [blankWalletAddress, setBlankWalletAddress] = useState<string>('');
 
   // Browser LM status tracking
   const [browserLmProgress, setBrowserLmProgress] = useState<number>(0);
@@ -155,7 +157,15 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
 
   const handleConfirmBlank = () => {
     const balanceNum = parseFloat(blankBalance) || 0;
-    initializeBlank(blankAccountName, blankAccountType, balanceNum, blankCurrency);
+    initializeBlank(
+      blankAccountName,
+      blankAccountType,
+      balanceNum,
+      blankCurrency,
+      blankInstitution,
+      blankNetwork,
+      blankWalletAddress
+    );
     if (onClose) onClose();
   };
 
@@ -244,7 +254,7 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
                         className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
                           isSelected
                             ? 'border-violet-600 bg-violet-50/50 dark:bg-violet-950/30 text-violet-900 dark:text-violet-100 ring-2 ring-violet-500/20'
-                            : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-850 text-zinc-700 dark:text-zinc-300'
+                            : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-855 text-zinc-700 dark:text-zinc-300'
                         }`}
                       >
                         {opt.logo ? (
@@ -418,20 +428,20 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
             <div className="space-y-4 font-sans text-xs">
               <div className="p-4 bg-violet-50/50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-900/50 rounded-2xl text-violet-800 dark:text-violet-300">
                 <p className="leading-relaxed">
-                  Start fresh with a clean, blank ledger. The autonomous AI agent will record your expenses, bills, and budget envelopes over time through conversational chat or direct entries.
+                  Start fresh with a clean, blank ledger. Default is a Cash account with no bank specified. You can also configure crypto wallets or traditional bank accounts.
                 </p>
               </div>
 
               <div className="space-y-3 font-mono">
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                    Primary Account Name
+                    Account Name
                   </label>
                   <input
                     type="text"
                     value={blankAccountName}
                     onChange={e => setBlankAccountName(e.target.value)}
-                    placeholder="e.g. Primary Operating Checking"
+                    placeholder="e.g. Physical Cash Wallet, Phantom Solana, Chase Checking"
                     className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
                   />
                 </div>
@@ -443,13 +453,31 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
                     </label>
                     <select
                       value={blankAccountType}
-                      onChange={e => setBlankAccountType(e.target.value as AccountType)}
+                      onChange={e => {
+                        const nextType = e.target.value as AccountType;
+                        setBlankAccountType(nextType);
+                        if (nextType === 'cash') {
+                          setBlankAccountName('Physical Cash Wallet');
+                          setBlankInstitution('');
+                        } else if (nextType === 'crypto') {
+                          setBlankAccountName('Web3 Crypto Wallet');
+                          setBlankInstitution('Self-Custody');
+                        } else if (nextType === 'checking') {
+                          setBlankAccountName('Primary Checking');
+                          setBlankInstitution('Chase Bank');
+                        } else if (nextType === 'savings') {
+                          setBlankAccountName('Emergency Savings Vault');
+                          setBlankInstitution('Marcus');
+                        }
+                      }}
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
                     >
-                      <option value="checking">Checking</option>
+                      <option value="cash">Cash (Default / No bank required)</option>
+                      <option value="crypto">Crypto Wallet (Web3 / Cold Storage)</option>
+                      <option value="checking">Checking Account</option>
                       <option value="savings">Savings / Vault</option>
                       <option value="credit">Credit Card</option>
-                      <option value="investment">Investment</option>
+                      <option value="investment">Investment / Brokerage</option>
                     </select>
                   </div>
 
@@ -482,6 +510,8 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
                     >
                       <option value="USD">USD ($)</option>
+                      <option value="BDT">BDT (৳) - Bangladeshi Taka</option>
+                      <option value="RMB">RMB / CNY (¥) - Chinese Renminbi</option>
                       <option value="EUR">EUR (€)</option>
                       <option value="GBP">GBP (£)</option>
                       <option value="CAD">CAD ($)</option>
@@ -492,17 +522,46 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
 
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                      Bank / Institution Label
+                      {blankAccountType === 'cash' ? 'Bank / Institution (Optional)' : 'Bank / Custodian'}
                     </label>
                     <input
                       type="text"
                       value={blankInstitution}
                       onChange={e => setBlankInstitution(e.target.value)}
-                      placeholder="e.g. Chase Bank, Cash"
+                      placeholder={blankAccountType === 'cash' ? 'Leave empty (No bank specified)' : 'e.g. Chase, Self-Custody'}
                       className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
                     />
                   </div>
                 </div>
+
+                {blankAccountType === 'crypto' && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Blockchain Network
+                      </label>
+                      <input
+                        type="text"
+                        value={blankNetwork}
+                        onChange={e => setBlankNetwork(e.target.value)}
+                        placeholder="e.g. Solana, Ethereum, Bitcoin"
+                        className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                        Public Address (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={blankWalletAddress}
+                        onChange={e => setBlankWalletAddress(e.target.value)}
+                        placeholder="e.g. 0x... or solana address"
+                        className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3">
@@ -512,7 +571,7 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
                   className="w-full py-3 px-5 rounded-2xl bg-violet-600 text-white font-bold text-xs sm:text-sm hover:bg-violet-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-violet-600/20"
                 >
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Create Blank Account &amp; Enter Purse</span>
+                  <span>Create {blankAccountType.toUpperCase()} Account &amp; Enter Purse</span>
                 </button>
               </div>
             </div>

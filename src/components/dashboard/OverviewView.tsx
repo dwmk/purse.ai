@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 import { useFinance } from '../../context/FinanceContext';
+import { AccountType } from '../../types/finance';
 import {
   Wallet,
   ArrowUpRight,
   ShieldCheck,
   RotateCcw,
   Sparkles,
-  Trash2
+  Trash2,
+  Plus,
+  X,
+  Coins,
+  Banknote,
+  Building2,
+  CheckCircle2
 } from 'lucide-react';
 
 export const OverviewView: React.FC = () => {
@@ -17,6 +24,7 @@ export const OverviewView: React.FC = () => {
     actions,
     rollbackAction,
     deleteTransaction,
+    addAccount,
     setCurrentView
   } = useFinance();
 
@@ -24,17 +32,27 @@ export const OverviewView: React.FC = () => {
   const activeAccount = accounts[activeAccountIdx] || accounts[0] || {
     id: 'acc_default',
     name: 'Primary Account',
-    type: 'checking' as const,
+    type: 'cash' as const,
     balance: 0,
     currency: 'USD',
-    institution: 'Purse Vault',
-    accountNumberMask: '•••• 0001',
+    institution: '',
+    accountNumberMask: 'Cash',
     lastUpdated: new Date().toISOString()
   };
 
+  // Add Account Modal states
+  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
+  const [newAccType, setNewAccType] = useState<AccountType>('cash');
+  const [newAccName, setNewAccName] = useState('Cash Pocket');
+  const [newAccBalance, setNewAccBalance] = useState('0.00');
+  const [newAccCurrency, setNewAccCurrency] = useState('USD');
+  const [newAccInstitution, setNewAccInstitution] = useState('');
+  const [newAccNetwork, setNewAccNetwork] = useState('Solana');
+  const [newAccWalletAddress, setNewAccWalletAddress] = useState('');
+
   const totalLiquid = accounts
-    .filter(a => a.type === 'checking' || a.type === 'savings')
-    .reduce((sum, a) => sum + a.balance, 0);
+    .filter(a => a.type === 'checking' || a.type === 'savings' || a.type === 'cash')
+    .reduce((sum, a) => sum + Math.max(0, a.balance), 0);
 
   const monthlyEssentialNeeds = budgets
     .filter(b => b.type === 'need')
@@ -46,6 +64,30 @@ export const OverviewView: React.FC = () => {
   const recentTxs = transactions.slice(0, 6);
   const appliedActions = actions.filter(a => a.status === 'applied');
 
+  const handleCreateAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    const bal = parseFloat(newAccBalance) || 0;
+    addAccount({
+      name: newAccName.trim() || 'New Account',
+      type: newAccType,
+      balance: bal,
+      currency: newAccCurrency || 'USD',
+      institution: newAccType === 'cash' ? (newAccInstitution.trim() || undefined) : (newAccInstitution.trim() || (newAccType === 'crypto' ? 'Self-Custody' : 'Bank')),
+      network: newAccType === 'crypto' ? newAccNetwork.trim() : undefined,
+      walletAddress: newAccType === 'crypto' ? newAccWalletAddress.trim() : undefined,
+      accountNumberMask: newAccType === 'cash' ? 'Cash' : newAccType === 'crypto' ? (newAccWalletAddress ? `${newAccWalletAddress.slice(0, 4)}...${newAccWalletAddress.slice(-4)}` : 'Web3') : '•••• 5521'
+    });
+    setShowAddAccountModal(false);
+    // Select newly added account
+    setActiveAccountIdx(accounts.length);
+  };
+
+  const accountHeaderPrefix = activeAccount.type === 'cash'
+    ? (activeAccount.institution ? `${activeAccount.institution} · ` : 'Physical Cash · ')
+    : activeAccount.type === 'crypto'
+    ? `${activeAccount.network || 'Web3'} · `
+    : (activeAccount.institution ? `${activeAccount.institution} · ` : '');
+
   return (
     <div className="max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 space-y-6 font-sans">
       
@@ -56,14 +98,14 @@ export const OverviewView: React.FC = () => {
         <div className="lg:col-span-7 relative overflow-hidden rounded-3xl p-6 sm:p-7 bg-gradient-to-br from-violet-900 via-indigo-950 to-purple-950 text-white shadow-xl border border-violet-800/40 flex flex-col justify-between min-h-[220px]">
           
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-violet-400" />
-              <span className="font-mono text-xs uppercase tracking-wider text-violet-200">
-                {activeAccount.institution} · {activeAccount.name}
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="w-2.5 h-2.5 rounded-full bg-violet-400 shrink-0" />
+              <span className="font-mono text-xs uppercase tracking-wider text-violet-200 truncate">
+                {accountHeaderPrefix}{activeAccount.name}
               </span>
             </div>
-            <span className="font-mono text-xs text-violet-300/80">
-              {activeAccount.accountNumberMask}
+            <span className="font-mono text-xs text-violet-300/80 shrink-0">
+              {activeAccount.network || activeAccount.accountNumberMask || (activeAccount.type === 'cash' ? 'No Bank' : '')}
             </span>
           </div>
 
@@ -91,6 +133,15 @@ export const OverviewView: React.FC = () => {
                 {acc.type.toUpperCase()}: ${acc.balance.toFixed(0)}
               </button>
             ))}
+
+            <button
+              onClick={() => setShowAddAccountModal(true)}
+              className="px-2.5 py-1 rounded-full text-xs font-mono whitespace-nowrap bg-white/20 hover:bg-white/30 text-white flex items-center gap-1 cursor-pointer transition-colors"
+              title="Add Cash, Crypto, or Bank Account"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Add Account</span>
+            </button>
           </div>
         </div>
 
@@ -223,6 +274,180 @@ export const OverviewView: React.FC = () => {
         <Sparkles className="w-4 h-4" />
         <span>Ask Fiona to Log or Analyze</span>
       </button>
+
+      {/* Add Account Modal */}
+      {showAddAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#121216] border border-zinc-200 dark:border-zinc-800 rounded-3xl shadow-2xl max-w-md w-full p-6 text-zinc-900 dark:text-zinc-100 font-mono text-xs space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-violet-600/10 text-violet-600 dark:text-violet-400 flex items-center justify-center font-bold">
+                  {newAccType === 'crypto' ? <Coins className="w-4 h-4" /> : newAccType === 'cash' ? <Banknote className="w-4 h-4" /> : <Building2 className="w-4 h-4" />}
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-tight">Add New Account</h3>
+                  <span className="text-[10px] text-zinc-500 block">Expand your multi-asset portfolio</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAddAccountModal(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateAccount} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Account Type
+                </label>
+                <select
+                  value={newAccType}
+                  onChange={e => {
+                    const nt = e.target.value as AccountType;
+                    setNewAccType(nt);
+                    if (nt === 'cash') {
+                      setNewAccName('Physical Cash Pocket');
+                      setNewAccInstitution('');
+                    } else if (nt === 'crypto') {
+                      setNewAccName('Web3 Crypto Wallet');
+                      setNewAccInstitution('Self-Custody');
+                    } else if (nt === 'checking') {
+                      setNewAccName('Secondary Checking');
+                      setNewAccInstitution('Bank');
+                    } else if (nt === 'savings') {
+                      setNewAccName('High-Yield Savings');
+                      setNewAccInstitution('Marcus');
+                    } else if (nt === 'credit') {
+                      setNewAccName('Rewards Credit Card');
+                      setNewAccInstitution('Chase');
+                    } else if (nt === 'investment') {
+                      setNewAccName('Stock Brokerage');
+                      setNewAccInstitution('Fidelity');
+                    }
+                  }}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500 cursor-pointer"
+                >
+                  <option value="cash">Cash Account (Default / No bank required)</option>
+                  <option value="crypto">Crypto Wallet (Web3 / Cold Storage)</option>
+                  <option value="checking">Checking Account</option>
+                  <option value="savings">Savings Vault</option>
+                  <option value="credit">Credit Card</option>
+                  <option value="investment">Investment / Brokerage</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  Account Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newAccName}
+                  onChange={e => setNewAccName(e.target.value)}
+                  placeholder="e.g. Physical Cash Wallet, Phantom SOL, Chase Checking"
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Starting Balance
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={newAccBalance}
+                    onChange={e => setNewAccBalance(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500 tabular-nums"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                    Currency
+                  </label>
+                  <select
+                    value={newAccCurrency}
+                    onChange={e => setNewAccCurrency(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500 cursor-pointer"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="BDT">BDT (৳) - Bangladeshi Taka</option>
+                    <option value="RMB">RMB / CNY (¥) - Chinese Renminbi</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="CAD">CAD ($)</option>
+                    <option value="AUD">AUD ($)</option>
+                    <option value="JPY">JPY (¥)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                  {newAccType === 'cash' ? 'Bank (Optional)' : 'Institution / Custodian'}
+                </label>
+                <input
+                  type="text"
+                  value={newAccInstitution}
+                  onChange={e => setNewAccInstitution(e.target.value)}
+                  placeholder={newAccType === 'cash' ? 'None (No bank)' : 'e.g. Chase, Self-Custody'}
+                  className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                />
+              </div>
+
+              {newAccType === 'crypto' && (
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Network
+                    </label>
+                    <input
+                      type="text"
+                      value={newAccNetwork}
+                      onChange={e => setNewAccNetwork(e.target.value)}
+                      placeholder="e.g. Solana, Ethereum, Bitcoin"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 dark:text-zinc-300 mb-1">
+                      Public Address
+                    </label>
+                    <input
+                      type="text"
+                      value={newAccWalletAddress}
+                      onChange={e => setNewAccWalletAddress(e.target.value)}
+                      placeholder="0x... or solana address"
+                      className="w-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-violet-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAccountModal(false)}
+                  className="px-4 py-2 border border-zinc-300 dark:border-zinc-700 rounded-xl text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-violet-600 text-white font-bold rounded-xl hover:bg-violet-700 transition-colors cursor-pointer shadow-md shadow-violet-600/20"
+                >
+                  Create Account
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

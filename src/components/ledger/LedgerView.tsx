@@ -26,6 +26,7 @@ export const LedgerView: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedAccount, setSelectedAccount] = useState<string>('all');
 
   // Add Transaction Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -35,7 +36,7 @@ export const LedgerView: React.FC = () => {
   const [formCategory, setFormCategory] = useState<ExpenseCategory>('Groceries');
   const [formMerchant, setFormMerchant] = useState('');
   const [formNote, setFormNote] = useState('');
-  const [formAccount, setFormAccount] = useState(accounts[0]?.id || 'acc_chk_01');
+  const [formAccount, setFormAccount] = useState(accounts[0]?.id || 'acc_cash_01');
 
   // CSV Import Modal
   const [showImportModal, setShowImportModal] = useState(false);
@@ -63,7 +64,8 @@ export const LedgerView: React.FC = () => {
       (t.note && t.note.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCat = selectedCategory === 'all' || t.category === selectedCategory;
     const matchesType = selectedType === 'all' || t.type === selectedType;
-    return matchesSearch && matchesCat && matchesType;
+    const matchesAccount = selectedAccount === 'all' || t.accountId === selectedAccount;
+    return matchesSearch && matchesCat && matchesType && matchesAccount;
   });
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -186,6 +188,18 @@ export const LedgerView: React.FC = () => {
           </select>
         </div>
 
+        {/* Account Filter */}
+        <select
+          value={selectedAccount}
+          onChange={e => setSelectedAccount(e.target.value)}
+          className="bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 rounded-xs text-neutral-800 dark:text-neutral-200 focus:outline-none cursor-pointer"
+        >
+          <option value="all">All Accounts</option>
+          {accounts.map(a => (
+            <option key={a.id} value={a.id}>{a.name} ({a.type.toUpperCase()})</option>
+          ))}
+        </select>
+
         {/* Type Filter */}
         <select
           value={selectedType}
@@ -209,18 +223,19 @@ export const LedgerView: React.FC = () => {
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 font-mono text-neutral-500 dark:text-neutral-400">
-                <th className="py-2.5 px-4 font-medium w-28">DATE</th>
+                <th className="py-2.5 px-4 font-medium w-24">DATE</th>
                 <th className="py-2.5 px-4 font-medium">MERCHANT / PAYEE</th>
+                <th className="py-2.5 px-4 font-medium hidden sm:table-cell">ACCOUNT</th>
                 <th className="py-2.5 px-4 font-medium">CATEGORY</th>
                 <th className="py-2.5 px-4 font-medium hidden md:table-cell">NOTE</th>
-                <th className="py-2.5 px-4 font-medium text-right w-32">AMOUNT</th>
+                <th className="py-2.5 px-4 font-medium text-right w-28">AMOUNT</th>
                 <th className="py-2.5 px-4 font-medium text-center w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/80 font-mono">
               {filteredTxs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-neutral-500 dark:text-neutral-400">
+                  <td colSpan={7} className="py-8 text-center text-neutral-500 dark:text-neutral-400">
                     No matching records found. Use conversational assistant or click &quot;Record Transaction&quot;.
                   </td>
                 </tr>
@@ -228,6 +243,7 @@ export const LedgerView: React.FC = () => {
                 filteredTxs.map(t => {
                   const isIncome = t.type === 'income';
                   const isTransfer = t.type === 'transfer';
+                  const acc = accounts.find(a => a.id === t.accountId);
                   return (
                     <tr
                       key={t.id}
@@ -238,6 +254,12 @@ export const LedgerView: React.FC = () => {
                       </td>
                       <td className="py-2 px-4 font-semibold text-neutral-900 dark:text-white">
                         {t.merchant}
+                      </td>
+                      <td className="py-2 px-4 text-neutral-600 dark:text-neutral-300 hidden sm:table-cell">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-xs text-[10px] bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 font-mono">
+                          {acc?.name || 'Cash'}
+                          <span className="text-neutral-400">({acc?.type || 'cash'})</span>
+                        </span>
                       </td>
                       <td className="py-2 px-4 text-neutral-600 dark:text-neutral-300">
                         {t.category}
@@ -360,7 +382,7 @@ export const LedgerView: React.FC = () => {
                   className="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-700 p-2 text-neutral-900 dark:text-white rounded-xs focus:outline-none"
                 >
                   {accounts.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} (${a.balance.toFixed(2)})</option>
+                    <option key={a.id} value={a.id}>{a.name} [{a.type.toUpperCase()}] (${a.balance.toFixed(2)})</option>
                   ))}
                 </select>
               </div>
