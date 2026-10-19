@@ -309,10 +309,12 @@ export const AgentChatView: React.FC = () => {
   ];
 
   const currentModel = MODEL_OPTIONS.find(m => m.id === config.provider) || MODEL_OPTIONS[0];
-  const isCurrentKeyMissing = (currentModel.id === 'openai' || currentModel.id === 'deepseek' || currentModel.id === 'zai') && !config.apiKey?.trim();
+  const activeKeyForCurrent = config.apiKeys?.[config.provider] || (config.apiKey || '');
+  const isCurrentKeyMissing = currentModel.isApiBased && !activeKeyForCurrent.trim();
 
   const handleSelectModel = (opt: typeof MODEL_OPTIONS[0]) => {
-    updateConfig({ provider: opt.id, model: opt.model });
+    const keyForProvider = config.apiKeys?.[opt.id] || (config.provider === opt.id ? (config.apiKey || '') : '');
+    updateConfig({ provider: opt.id, model: opt.model, apiKey: keyForProvider });
     setShowModelMenu(false);
 
     if (opt.id === 'edge') {

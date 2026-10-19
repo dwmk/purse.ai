@@ -714,6 +714,16 @@ export const StorageService = {
     localStorage.setItem(STORAGE_KEYS.THEME, theme);
   },
 
+  isSpeechEnabled(): boolean {
+    if (typeof window === 'undefined') return true;
+    return localStorage.getItem('purse_speech_enabled') !== 'false';
+  },
+
+  saveSpeechEnabled(enabled: boolean): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('purse_speech_enabled', enabled ? 'true' : 'false');
+  },
+
   // Calculate total browser storage used
   getStorageUsage(): { bytes: number; formatted: string } {
     let total = 0;

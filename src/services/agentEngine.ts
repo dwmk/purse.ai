@@ -6,6 +6,7 @@ import {
   BudgetEnvelope,
   ExpenseCategory,
   LLMConfig,
+  LLMProvider,
   MemoryFile,
   Transaction
 } from '../types/finance';
@@ -27,6 +28,7 @@ export interface AgentResponse {
   content: string;
   plan?: AgentTaskPlan;
   action?: AgentAction;
+  actions?: AgentAction[];
   updatedMemory?: MemoryFile;
   memoryNote?: string;
   measurableValue?: string;
@@ -124,6 +126,714 @@ export function runEdgeCognition(userInput: string, context: AgentContext): Agen
   const totalLiquid = accounts
     .filter(a => a.type === 'checking' || a.type === 'savings' || a.type === 'cash')
     .reduce((sum, a) => sum + Math.max(0, a.balance), 0);
+
+  // 0A. INTENT: THEME & APPEARANCE (Switch theme, set light/dark mode)
+  const isThemeSwitch =
+    lower === 'switch theme' ||
+    lower === 'toggle theme' ||
+    lower.includes('theme to light') ||
+    lower.includes('theme to dark') ||
+    lower.includes('light mode') ||
+    lower.includes('dark mode') ||
+    lower.includes('light theme') ||
+    lower.includes('dark theme') ||
+    lower.includes('change theme') ||
+    lower.includes('switch to dark') ||
+    lower.includes('switch to light') ||
+    (lower.includes('theme') && (lower.includes('switch') || lower.includes('toggle') || lower.includes('change') || lower.includes('set')));
+
+  if (isThemeSwitch) {
+    let targetTheme: 'light' | 'dark';
+    if (lower.includes('light') || lower.includes('day') || lower.includes('white')) {
+      targetTheme = 'light';
+    } else if (lower.includes('dark') || lower.includes('night') || lower.includes('obsidian')) {
+      targetTheme = 'dark';
+    } else {
+      // Toggle from current context theme
+      targetTheme = context.theme === 'dark' ? 'light' : 'dark';
+    }
+
+    const action: AgentAction = {
+      id: `act_settings_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'UPDATE_SETTINGS',
+      description: `Switch interface theme to ${targetTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}`,
+      payload: { theme: targetTheme },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.99
+    };
+
+    return {
+      content: `I've switched your theme to **${targetTheme === 'dark' ? 'Dark Mode' : 'Light Mode'}**! The interface styling has updated immediately.`,
+      measurableValue: `Theme: ${targetTheme.toUpperCase()} MODE`,
+      plan: {
+        id: `plan_theme_${Date.now()}`,
+        intent: 'UPDATE_THEME',
+        confidence: 0.99,
+        reasoning: `User requested switching theme to ${targetTheme} mode.`,
+        steps: [
+          { step: 1, title: 'Parse Theme Request', detail: `Target: ${targetTheme.toUpperCase()} mode`, status: 'completed' },
+          { step: 2, title: 'Apply Theme Palette', detail: `Updated visual tokens to ${targetTheme}`, status: 'completed' }
+        ],
+        proposedAction: action
+      },
+      action
+    };
+  }
+
+  // 0B. INTENT: VOICE READOUT (Mute/Unmute speech)
+  if (lower.includes('mute') || lower.includes('unmute') || (lower.includes('voice') && (lower.includes('turn on') || lower.includes('turn off') || lower.includes('disable') || lower.includes('enable')))) {
+    const shouldEnable = lower.includes('unmute') || lower.includes('turn on') || lower.includes('enable');
+    const action: AgentAction = {
+      id: `act_speech_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type: 'UPDATE_SETTINGS',
+      description: shouldEnable ? 'Enable voice readout audio' : 'Mute voice readout audio',
+      payload: { isSpeechEnabled: shouldEnable },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.99
+    };
+
+    return {
+      content: shouldEnable
+        ? "I've enabled voice readout! I'll read out summaries aloud as we converse."
+        : "I've muted voice readout. All future responses will be strictly visual text.",
+      measurableValue: shouldEnable ? 'Voice: ON' : 'Voice: MUTED',
+      action
+    };
+  }
+
+  // 0C. INTENT: BALANCES FROM ALL ACCOUNTS QUERY
+  const isBalanceQuery =
+    lower.includes('what are my current balances from all my accounts') ||
+    lower.includes('what are my current balances') ||
+    lower.includes('what are my balances') ||
+    lower.includes('balances from all my accounts') ||
+    lower.includes('how much money do i have') ||
+    lower.includes('show my accounts') ||
+    lower.includes('list my accounts') ||
+    (lower.includes('balance') && (lower.includes('all') || lower.includes('current') || lower.includes('what are') || lower.includes('show')));
+
+  if (isBalanceQuery && !lower.includes('update') && !lower.includes('set balance') && !lower.includes('change balance')) {
+    const totalNetWorth = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+    const breakdown = accounts.map(a => {
+      const typeBadge = a.type.toUpperCase();
+      const instStr = a.institution ? ` (${a.institution})` : (a.type === 'cash' ? ' (Cash/Physical)' : '');
+      const netStr = a.network ? ` · Network: ${a.network}` : '';
+      const maskStr = a.accountNumberMask ? ` · ${a.accountNumberMask}` : '';
+      const balStr = a.balance >= 0
+        ? `$${a.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : `-$${Math.abs(a.balance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `- **${a.name}** [${typeBadge}]: **${balStr}**${instStr}${maskStr}${netStr}`;
+    }).join('\n');
+
+    return {
+      content: `### Current Balances Across All Accounts\n\nHere is your real-time balance breakdown across all **${accounts.length} active account(s)**:\n\n${breakdown}\n\n---\n**Liquidity & Net Worth Summary:**\n- **Total Liquid Reserves (Checking + Savings + Cash):** **$${totalLiquid.toLocaleString('en-US', { minimumFractionDigits: 2 })}**\n- **Total Combined Net Worth:** **$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2 })}**\n- **Safe Operating Checking Cushion:** $${checkingBalance.toFixed(2)} (Safe Floor: $${memory.profile.minimumCheckingFloor.toFixed(2)})\n\nFeel free to ask me to log new transactions, record a transfer between accounts, or update an account balance anytime!`,
+      measurableValue: `$${totalNetWorth.toLocaleString('en-US', { minimumFractionDigits: 2 })} Total Net Worth`,
+      plan: {
+        id: `plan_bal_${Date.now()}`,
+        intent: 'ACCOUNT_BALANCES_AUDIT',
+        confidence: 0.99,
+        reasoning: 'Retrieved and verified balances across all configured ledger accounts.',
+        steps: [
+          { step: 1, title: 'Fetch Ledger Accounts', detail: `Located ${accounts.length} active account entities`, status: 'completed' },
+          { step: 2, title: 'Sum Liquid & Credit Reserves', detail: `Total Liquid: $${totalLiquid.toFixed(2)} · Net Worth: $${totalNetWorth.toFixed(2)}`, status: 'completed' },
+          { step: 3, title: 'Verify Operating Cushion', detail: `Checking balance: $${checkingBalance.toFixed(2)}`, status: 'completed' }
+        ]
+      }
+    };
+  }
+
+  // 0D. INTENT: UPCOMING BILLS QUERY
+  const isBillsQuery =
+    (lower.includes('upcoming bill') || lower.includes('upcoming bills') || lower.includes('what bills') || lower.includes('any bills') || lower.includes('do i have any upcoming bills') || lower.includes('bills due')) &&
+    !lower.includes('add') && !lower.includes('create') && !lower.includes('delete') && !lower.includes('remove') && !lower.includes('pay');
+
+  if (isBillsQuery) {
+    const totalObligations = bills.reduce((sum, b) => sum + b.amount, 0);
+    const unpaidBills = bills.filter(b => !b.isPaidThisCycle && b.status !== 'paid');
+    const totalUnpaid = unpaidBills.reduce((sum, b) => sum + b.amount, 0);
+
+    const billList = bills.length > 0
+      ? bills.map(b => {
+          const isPaid = b.isPaidThisCycle || b.status === 'paid';
+          const statusIcon = isPaid ? '✅ Paid this cycle' : '⏳ Due';
+          const autopayBadge = b.isAutopay ? '· Autopay' : '· Manual';
+          return `- **${b.name}**: **$${b.amount.toFixed(2)}** (Due: ${b.dueDate}) · Category: ${b.category} · ${statusIcon} ${autopayBadge}`;
+        }).join('\n')
+      : 'No upcoming bills are currently scheduled in your ledger.';
+
+    return {
+      content: `### Upcoming Recurring Bills & Obligations\n\nYou currently have **${bills.length} scheduled recurring bill(s)** totaling **$${totalObligations.toFixed(2)}/month** ($${totalUnpaid.toFixed(2)} remaining to pay this cycle):\n\n${billList}\n\n- **Next Payday:** ${memory.profile.nextPayday} ($${memory.profile.monthlyIncome.toFixed(2)} expected)\n- **Operating Cushion:** $${checkingBalance.toFixed(2)} available in checking\n\nLet me know if you would like to mark any bill as paid, add a new bill, or cancel an existing subscription!`,
+      measurableValue: `$${totalUnpaid.toFixed(2)} Unpaid Bills This Cycle`,
+      plan: {
+        id: `plan_bills_${Date.now()}`,
+        intent: 'UPCOMING_BILLS_AUDIT',
+        confidence: 0.99,
+        reasoning: 'Audited upcoming bill dates against checking balance and payday timeline.',
+        steps: [
+          { step: 1, title: 'Retrieve Bill Schedule', detail: `Found ${bills.length} active recurring commitments`, status: 'completed' },
+          { step: 2, title: 'Calculate Cycle Obligations', detail: `$${totalUnpaid.toFixed(2)} remaining to clear`, status: 'completed' }
+        ]
+      }
+    };
+  }
+
+  // 0E. INTENT: WHAT DO YOU KNOW ABOUT ME (MEMORY & PROFILE QUERY)
+  const isMemoryQuery =
+    lower.includes('what do you know about me so far') ||
+    lower.includes('what do you know about me') ||
+    lower.includes('what do you remember') ||
+    lower.includes('what do you know') ||
+    lower.includes('tell me about me') ||
+    lower.includes('what are my rules') ||
+    lower.includes('who am i financially');
+
+  if (isMemoryQuery) {
+    const rulesList = memory.rules.length > 0
+      ? memory.rules.map((r, i) => `${i + 1}. ${r}`).join('\n')
+      : 'No custom behavioral rules configured yet.';
+
+    const habitsList = memory.habits.length > 0
+      ? memory.habits.map((h, i) => `- ${h}`).join('\n')
+      : 'No recurring habits logged yet.';
+
+    return {
+      content: `### What I Know About You & Your Financial Profile\n\nI store your financial knowledge graph 100% privately in your browser local storage (Revision #${memory.revisionCount}, last updated ${memory.lastUpdated.split('T')[0]}):\n\n#### 1. Core Profile & Liquidity Invariants\n- **Monthly Net Income:** **$${memory.profile.monthlyIncome.toFixed(2)}** (${memory.profile.paydayCadence})\n- **Next Payday:** **${memory.profile.nextPayday}**\n- **Emergency Fund Vault Target:** $${memory.profile.emergencyFundTarget.toFixed(2)}\n- **Safe Operating Checking Floor:** $${memory.profile.minimumCheckingFloor.toFixed(2)} (safety cushion)\n- **Target Savings Rate:** ${memory.profile.savingsRateTargetPercent}%\n- **Primary Currency:** ${memory.profile.currency || 'USD'}\n\n#### 2. Active Behavioral Rules & Preferences (${memory.rules.length})\n${rulesList}\n\n#### 3. Detected Habits & Spending Patterns\n${habitsList}\n\nYou can teach me new rules anytime by saying *"remember that [rule]"*, or ask me to forget/delete any rule!`,
+      measurableValue: `${memory.rules.length} Rules · Revision #${memory.revisionCount}`,
+      plan: {
+        id: `plan_mem_query_${Date.now()}`,
+        intent: 'KNOWLEDGE_GRAPH_RETRIEVAL',
+        confidence: 0.99,
+        reasoning: 'Extracted active financial profile and behavioral rules from persistent memory.',
+        steps: [
+          { step: 1, title: 'Read Persistent Memory File', detail: `Revision #${memory.revisionCount}`, status: 'completed' },
+          { step: 2, title: 'Synthesize Invariants & Habits', detail: `${memory.rules.length} rules and ${memory.habits.length} habits loaded`, status: 'completed' }
+        ]
+      }
+    };
+  }
+
+  // 0F. INTENT: BUDGET ENVELOPES REVIEW QUERY
+  const isBudgetReviewQuery =
+    (lower.includes('budget') && (lower.includes('envelope') || lower.includes('review') || lower.includes('what are') || lower.includes('show') || lower.includes('status'))) &&
+    !lower.includes('add') && !lower.includes('create') && !lower.includes('delete') && !lower.includes('update') && !lower.includes('increase');
+
+  if (isBudgetReviewQuery) {
+    const totalBudget = budgets.reduce((sum, b) => sum + b.allocated, 0);
+    const envList = budgets.map(b => {
+      const spent = transactions
+        .filter(t => t.category === b.category && t.type === 'expense')
+        .reduce((sum, t) => sum + t.amount, 0);
+      const remaining = b.allocated - spent;
+      return `- **${b.category}** [${b.type.toUpperCase()}]: **$${b.allocated.toFixed(2)}/mo** (Spent: $${spent.toFixed(2)}, Headroom: $${remaining.toFixed(2)})`;
+    }).join('\n');
+
+    return {
+      content: `### Monthly Budget Envelopes Overview\n\nYou currently have **${budgets.length} budget envelopes** with a combined allocation of **$${totalBudget.toFixed(2)}/month**:\n\n${envList}\n\nFeel free to adjust any envelope allocation anytime by saying *"set [category] budget to $[amount]"*!`,
+      measurableValue: `$${totalBudget.toFixed(2)} Total Monthly Budgets`,
+      plan: {
+        id: `plan_bud_rev_${Date.now()}`,
+        intent: 'BUDGET_ENVELOPES_REVIEW',
+        confidence: 0.98,
+        reasoning: 'Calculated headroom across all budget envelopes against current cycle expenses.',
+        steps: [
+          { step: 1, title: 'Retrieve Envelopes', detail: `${budgets.length} envelopes active`, status: 'completed' },
+          { step: 2, title: 'Calculate Category Spend', detail: 'Cross-referenced against transactions', status: 'completed' }
+        ]
+      }
+    };
+  }
+
+  // 0G. INTENT: DELETE / REMOVE / EDIT ACCOUNTS VIA CHAT
+  const delAccMatch = text.match(/(?:delete|remove)\s+(?:account\s+)?([A-Za-z0-9'\s&.-]+)/i);
+  if (delAccMatch && !lower.includes('bill') && !lower.includes('transaction') && !lower.includes('rule') && !lower.includes('budget')) {
+    const targetQuery = delAccMatch[1].trim().toLowerCase();
+    const target = accounts.find(a => a.name.toLowerCase().includes(targetQuery) || a.id.toLowerCase() === targetQuery);
+    if (target) {
+      const action: AgentAction = {
+        id: `act_del_acc_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'DELETE_ACCOUNT',
+        description: `Delete account "${target.name}" (${target.type.toUpperCase()}) with balance $${target.balance.toFixed(2)}`,
+        payload: target,
+        status: 'pending',
+        safetyLevel: 'medium_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared a safe execution plan to remove the account **"${target.name}"** ($${target.balance.toFixed(2)}). Any associated transactions will remain preserved and remapped to your primary account.\n\nPlease confirm in the gate below to commit this removal.`,
+        measurableValue: `Delete account: ${target.name}`,
+        plan: {
+          id: `plan_del_acc_${Date.now()}`,
+          intent: 'DELETE_ACCOUNT',
+          confidence: 0.98,
+          reasoning: `User requested deleting account ${target.name}.`,
+          steps: [
+            { step: 1, title: 'Verify Account', detail: `${target.name} (${target.id})`, status: 'completed' },
+            { step: 2, title: 'Prepare Non-Destructive Removal', detail: 'Awaiting user execution gate confirmation', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0H. INTENT: PAY / DELETE BILLS VIA CHAT
+  if (lower.includes('pay') && lower.includes('bill')) {
+    const billMatch = text.match(/(?:pay|mark\s+paid|paid)\s+(?:bill\s+)?([A-Za-z0-9'\s&.-]+)/i);
+    const query = billMatch ? billMatch[1].trim().toLowerCase() : '';
+    const target = bills.find(b => b.name.toLowerCase().includes(query)) || bills[0];
+    if (target) {
+      const action: AgentAction = {
+        id: `act_pay_bill_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'PAY_BILL',
+        description: `Mark recurring bill "${target.name}" ($${target.amount.toFixed(2)}) as paid for this cycle`,
+        payload: { id: target.id, updates: { isPaidThisCycle: true, status: 'paid' }, previous: target },
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I have prepared to mark your bill **${target.name}** ($${target.amount.toFixed(2)}) as **Paid** for this billing cycle.\n\nPlease confirm below to commit this change.`,
+        measurableValue: `Marked bill paid: ${target.name}`,
+        plan: {
+          id: `plan_pay_bill_${Date.now()}`,
+          intent: 'PAY_BILL',
+          confidence: 0.98,
+          reasoning: `User requested marking bill ${target.name} as paid.`,
+          steps: [
+            { step: 1, title: 'Locate Bill', detail: `${target.name} ($${target.amount.toFixed(2)})`, status: 'completed' },
+            { step: 2, title: 'Update Status to Paid', detail: 'Cycle status updated', status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  const delBillMatch = text.match(/(?:delete|remove|cancel)\s+(?:bill\s+)?([A-Za-z0-9'\s&.-]+)/i);
+  if (delBillMatch && (lower.includes('bill') || lower.includes('subscription')) && !lower.includes('account') && !lower.includes('transaction')) {
+    const query = delBillMatch[1].trim().toLowerCase();
+    const target = bills.find(b => b.name.toLowerCase().includes(query));
+    if (target) {
+      const action: AgentAction = {
+        id: `act_del_bill_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'DELETE_BILL',
+        description: `Delete recurring bill "${target.name}" ($${target.amount.toFixed(2)}/mo)`,
+        payload: target,
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to remove the recurring bill **"${target.name}"** ($${target.amount.toFixed(2)}/mo) from your schedule.\n\nPlease approve below to commit this removal.`,
+        measurableValue: `Deleted bill: ${target.name}`,
+        plan: {
+          id: `plan_del_bill_${Date.now()}`,
+          intent: 'DELETE_BILL',
+          confidence: 0.98,
+          reasoning: `User requested removing bill ${target.name}.`,
+          steps: [
+            { step: 1, title: 'Locate Bill', detail: target.name, status: 'completed' },
+            { step: 2, title: 'Update Cashflow Commitments', detail: `Recovered $${target.amount.toFixed(2)}/mo`, status: 'completed' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0I. INTENT: DELETE MEMORY RULE VIA CHAT
+  if ((lower.includes('forget') || lower.includes('delete rule') || lower.includes('remove rule')) && (lower.includes('rule') || lower.includes('remember'))) {
+    const ruleNumMatch = text.match(/rule\s*#?([0-9]+)/i);
+    let targetIdx = -1;
+    if (ruleNumMatch) {
+      targetIdx = parseInt(ruleNumMatch[1], 10) - 1;
+    } else {
+      const query = text.replace(/^(?:forget|delete rule|remove rule)\s*/i, '').trim().toLowerCase();
+      targetIdx = memory.rules.findIndex(r => r.toLowerCase().includes(query));
+    }
+
+    if (targetIdx >= 0 && targetIdx < memory.rules.length) {
+      const removedRule = memory.rules[targetIdx];
+      const updatedRules = memory.rules.filter((_, idx) => idx !== targetIdx);
+      const updatedMem: MemoryFile = {
+        ...memory,
+        rules: updatedRules,
+        rawMarkdown: `${memory.rawMarkdown}\n- REMOVED_RULE: ${removedRule} (Cleared on ${new Date().toISOString().split('T')[0]})`,
+        lastUpdated: new Date().toISOString(),
+        revisionCount: memory.revisionCount + 1
+      };
+
+      const action: AgentAction = {
+        id: `act_del_mem_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'DELETE_MEMORY_RULE',
+        description: `Remove operational rule from Memory: "${removedRule}"`,
+        payload: updatedMem,
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to remove the rule:\n\n> "${removedRule}"\n\nfrom your persistent memory graph. Please confirm to commit this update.`,
+        measurableValue: 'Memory Rule Removed',
+        plan: {
+          id: `plan_del_mem_${Date.now()}`,
+          intent: 'DELETE_MEMORY_RULE',
+          confidence: 0.98,
+          reasoning: `Removed rule from memory.`,
+          steps: [
+            { step: 1, title: 'Locate Invariant', detail: removedRule, status: 'completed' },
+            { step: 2, title: 'Compile Memory Revision', detail: `Revision #${updatedMem.revisionCount}`, status: 'completed' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0J. INTENT: RECENT TRANSACTIONS QUERY
+  const isTxQuery =
+    (lower.includes('recent transaction') || lower.includes('recent transactions') || lower.includes('show my transactions') || lower.includes('what are my transactions') || lower.includes('show transactions') || lower.includes('last transactions')) &&
+    !lower.includes('add') && !lower.includes('delete') && !lower.includes('remove') && !lower.includes('edit');
+
+  if (isTxQuery) {
+    const recent = transactions.slice(0, 8);
+    const txList = recent.length > 0
+      ? recent.map(t => {
+          const acc = accounts.find(a => a.id === t.accountId);
+          const sign = t.type === 'income' ? '+' : '-';
+          return `- **${t.merchant}**: **${sign}$${t.amount.toFixed(2)}** (${t.date}) · ${t.category} · [${acc?.name || 'Account'}]`;
+        }).join('\n')
+      : 'No transactions recorded yet in your ledger.';
+
+    return {
+      content: `### Recent Transactions\n\nHere are your most recent recorded ledger entries:\n\n${txList}\n\nYou can ask me to log new transactions, edit any entry, or delete a transaction anytime!`,
+      measurableValue: `${recent.length} Recent Transactions`,
+      plan: {
+        id: `plan_tx_audit_${Date.now()}`,
+        intent: 'TRANSACTIONS_AUDIT',
+        confidence: 0.99,
+        reasoning: 'Retrieved latest ledger entries.',
+        steps: [
+          { step: 1, title: 'Fetch Recent Transactions', detail: `Retrieved ${recent.length} records`, status: 'completed' },
+          { step: 2, title: 'Cross-reference Accounts', detail: 'Mapped to ledger accounts', status: 'completed' }
+        ]
+      }
+    };
+  }
+
+  // 0K. INTENT: EDIT / UPDATE ACCOUNT BALANCE OR NAME
+  const editAccBalMatch = text.match(/(?:update|edit|set|change)\s+(?:account\s+)?([A-Za-z0-9'\s&.-]+?)\s+balance\s+(?:to\s+)?\$?([0-9.]+)/i);
+  if (editAccBalMatch) {
+    const accQuery = editAccBalMatch[1].trim().toLowerCase();
+    const newBal = parseFloat(editAccBalMatch[2]);
+    const target = accounts.find(a => a.name.toLowerCase().includes(accQuery) || a.id.toLowerCase() === accQuery) || accounts[0];
+    if (target && !isNaN(newBal)) {
+      const action: AgentAction = {
+        id: `act_edit_acc_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'EDIT_ACCOUNT',
+        description: `Update "${target.name}" balance: $${target.balance.toFixed(2)} → $${newBal.toFixed(2)}`,
+        payload: { id: target.id, updates: { balance: newBal }, previous: target },
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to update the balance of **"${target.name}"** from **$${target.balance.toFixed(2)}** to **$${newBal.toFixed(2)}**.\n\nPlease confirm in the gate below to commit this update.`,
+        measurableValue: `Balance: ${target.name} → $${newBal.toFixed(2)}`,
+        plan: {
+          id: `plan_edit_acc_${Date.now()}`,
+          intent: 'UPDATE_ACCOUNT',
+          confidence: 0.98,
+          reasoning: `User requested setting balance of ${target.name} to $${newBal.toFixed(2)}.`,
+          steps: [
+            { step: 1, title: 'Locate Account', detail: `${target.name} (${target.id})`, status: 'completed' },
+            { step: 2, title: 'Recalculate Reserve', detail: `$${target.balance.toFixed(2)} → $${newBal.toFixed(2)}`, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0L. INTENT: DELETE TRANSACTION VIA CHAT
+  const delTxMatch = text.match(/(?:delete|remove)\s+(?:transaction|tx)\s+(?:for\s+|with\s+|named\s+)?([A-Za-z0-9'\s&.-]+)/i);
+  if (delTxMatch && (lower.includes('transaction') || lower.includes('tx')) && !lower.includes('account') && !lower.includes('bill')) {
+    const query = delTxMatch[1].trim().toLowerCase();
+    const target = transactions.find(t => t.id.toLowerCase() === query || t.merchant.toLowerCase().includes(query));
+    if (target) {
+      const action: AgentAction = {
+        id: `act_del_tx_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'DELETE_TRANSACTION',
+        description: `Delete transaction: ${target.merchant} ($${target.amount.toFixed(2)}) from ${target.date}`,
+        payload: target,
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to remove the transaction **${target.merchant}** ($${target.amount.toFixed(2)}, logged on ${target.date}). The affected account balance will be restored accordingly.\n\nPlease approve below to commit this deletion.`,
+        measurableValue: `Delete tx: ${target.merchant}`,
+        plan: {
+          id: `plan_del_tx_${Date.now()}`,
+          intent: 'DELETE_TRANSACTION',
+          confidence: 0.98,
+          reasoning: `User requested deleting transaction ${target.merchant}.`,
+          steps: [
+            { step: 1, title: 'Locate Transaction', detail: `${target.merchant} ($${target.amount.toFixed(2)})`, status: 'completed' },
+            { step: 2, title: 'Restore Balance Buffer', detail: 'Balance delta prepared', status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0M. INTENT: EDIT TRANSACTION VIA CHAT
+  const editTxMatch = text.match(/(?:edit|update|change)\s+(?:transaction\s+)?([A-Za-z0-9'\s&.-]+?)\s+(?:to|amount)\s+\$?([0-9.]+)/i);
+  if (editTxMatch && lower.includes('transaction')) {
+    const query = editTxMatch[1].trim().toLowerCase();
+    const newAmt = parseFloat(editTxMatch[2]);
+    const target = transactions.find(t => t.id.toLowerCase() === query || t.merchant.toLowerCase().includes(query));
+    if (target && !isNaN(newAmt)) {
+      const updates = { amount: newAmt };
+      const action: AgentAction = {
+        id: `act_edit_tx_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'EDIT_TRANSACTION',
+        description: `Update transaction "${target.merchant}" amount: $${target.amount.toFixed(2)} → $${newAmt.toFixed(2)}`,
+        payload: { id: target.id, updates, previous: target },
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to update the transaction for **${target.merchant}** from **$${target.amount.toFixed(2)}** to **$${newAmt.toFixed(2)}**.\n\nPlease approve below to commit this update.`,
+        measurableValue: `Update tx: ${target.merchant} → $${newAmt.toFixed(2)}`,
+        plan: {
+          id: `plan_edit_tx_${Date.now()}`,
+          intent: 'EDIT_TRANSACTION',
+          confidence: 0.98,
+          reasoning: `User requested updating transaction ${target.merchant} to $${newAmt.toFixed(2)}.`,
+          steps: [
+            { step: 1, title: 'Locate Transaction', detail: `${target.merchant} (${target.id})`, status: 'completed' },
+            { step: 2, title: 'Recalculate Ledger Impact', detail: `$${target.amount.toFixed(2)} → $${newAmt.toFixed(2)}`, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0N. INTENT: UPDATE BUDGET ENVELOPE VIA CHAT
+  const editBudgetMatch = text.match(/(?:update|set|change)\s+(?:budget\s+for\s+|budget\s+)?([A-Za-z0-9'\s&.-]+?)\s+budget\s+(?:to\s+)?\$?([0-9.]+)/i) ||
+    text.match(/(?:set|change|update)\s+([A-Za-z0-9'\s&.-]+?)\s+budget\s+(?:to\s+)?\$?([0-9.]+)/i);
+  if (editBudgetMatch && (lower.includes('budget') || lower.includes('envelope')) && !lower.includes('transaction') && !lower.includes('account')) {
+    const query = editBudgetMatch[1].trim().toLowerCase();
+    const newAmt = parseFloat(editBudgetMatch[2]);
+    const target = budgets.find(b => b.category.toLowerCase().includes(query) || b.id.toLowerCase() === query);
+    if (target && !isNaN(newAmt)) {
+      const action: AgentAction = {
+        id: `act_bud_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        type: 'UPDATE_BUDGET',
+        description: `Update "${target.category}" budget envelope to $${newAmt.toFixed(2)}/mo`,
+        payload: { id: target.id, category: target.category, allocated: newAmt, previousAllocated: target.allocated },
+        status: 'pending',
+        safetyLevel: 'low_risk',
+        confidenceScore: 0.98
+      };
+
+      return {
+        content: `I've prepared to update your **${target.category}** monthly budget envelope to **$${newAmt.toFixed(2)}/month** (previously $${target.allocated.toFixed(2)}).\n\nPlease confirm below to commit this change.`,
+        measurableValue: `Budget: ${target.category} → $${newAmt.toFixed(2)}`,
+        plan: {
+          id: `plan_bud_${Date.now()}`,
+          intent: 'UPDATE_BUDGET',
+          confidence: 0.98,
+          reasoning: `User requested setting ${target.category} budget to $${newAmt.toFixed(2)}.`,
+          steps: [
+            { step: 1, title: 'Identify Envelope', detail: target.category, status: 'completed' },
+            { step: 2, title: 'Recalculate Allocation', detail: `$${target.allocated.toFixed(2)} → $${newAmt.toFixed(2)}`, status: 'completed' },
+            { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+          ],
+          proposedAction: action
+        },
+        action
+      };
+    }
+  }
+
+  // 0O. INTENT: BATCH POPULATE / SAMPLE DATA STACK (e.g. "populate my wallet, envelopes, bills with some random data")
+  const isPopulateIntent =
+    (lower.includes('populate') || lower.includes('seed') || lower.includes('generate random') || lower.includes('dummy data') || lower.includes('sample data') || lower.includes('fill with random') || (lower.includes('random data') && (lower.includes('wallet') || lower.includes('bill') || lower.includes('envelope')))) &&
+    (lower.includes('wallet') || lower.includes('envelope') || lower.includes('bill') || lower.includes('account') || lower.includes('data'));
+
+  if (isPopulateIntent) {
+    const timestamp = Date.now();
+    const actionsToStack: AgentAction[] = [];
+
+    // 1. Account (Wallet)
+    const newAccount: Account = {
+      id: `acc_wallet_${timestamp}`,
+      name: 'Physical Cash & Digital Wallet',
+      type: 'cash',
+      balance: 350.00,
+      currency: 'USD',
+      institution: '',
+      accountNumberMask: 'Cash Drawer',
+      lastUpdated: new Date().toISOString()
+    };
+    actionsToStack.push({
+      id: `act_acc_${timestamp}_1`,
+      timestamp: new Date().toISOString(),
+      type: 'ADD_ACCOUNT',
+      description: `Create account "Physical Cash & Digital Wallet" ($350.00)`,
+      payload: newAccount,
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    // 2. Budget Envelope (Groceries)
+    actionsToStack.push({
+      id: `act_bud_${timestamp}_2`,
+      timestamp: new Date().toISOString(),
+      type: 'UPDATE_BUDGET',
+      description: `Set "Groceries" budget envelope to $450.00/mo`,
+      payload: { id: 'b_02', category: 'Groceries', allocated: 450.00, previousAllocated: 400.00 },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    // 3. Budget Envelope (Dining & Nightlife)
+    actionsToStack.push({
+      id: `act_bud_${timestamp}_3`,
+      timestamp: new Date().toISOString(),
+      type: 'UPDATE_BUDGET',
+      description: `Set "Dining & Nightlife" budget envelope to $240.00/mo`,
+      payload: { id: 'b_06', category: 'Dining & Nightlife', allocated: 240.00, previousAllocated: 200.00 },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    // 4. Recurring Bill 1 (Netflix)
+    actionsToStack.push({
+      id: `act_bill_${timestamp}_4`,
+      timestamp: new Date().toISOString(),
+      type: 'ADD_BILL',
+      description: `Schedule recurring bill: Netflix Standard ($15.99/mo due 10th)`,
+      payload: {
+        id: `bill_${timestamp}_1`,
+        name: 'Netflix Standard',
+        amount: 15.99,
+        category: 'Subscriptions & Software',
+        frequency: 'monthly',
+        dueDate: '2026-11-10',
+        isAutopay: true,
+        isPaidThisCycle: false,
+        status: 'upcoming'
+      },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    // 5. Recurring Bill 2 (Electric Utility)
+    actionsToStack.push({
+      id: `act_bill_${timestamp}_5`,
+      timestamp: new Date().toISOString(),
+      type: 'ADD_BILL',
+      description: `Schedule recurring bill: City Electric & Grid ($84.50/mo due 18th)`,
+      payload: {
+        id: `bill_${timestamp}_2`,
+        name: 'City Electric & Grid',
+        amount: 84.50,
+        category: 'Utilities & Services',
+        frequency: 'monthly',
+        dueDate: '2026-11-18',
+        isAutopay: true,
+        isPaidThisCycle: false,
+        status: 'upcoming'
+      },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    // 6. Sample Transaction
+    actionsToStack.push({
+      id: `act_tx_${timestamp}_6`,
+      timestamp: new Date().toISOString(),
+      type: 'ADD_TRANSACTION',
+      description: `Log expense of $68.40 at Trader Joe's (Groceries)`,
+      payload: {
+        id: `tx_${timestamp}_1`,
+        date: new Date().toISOString().split('T')[0],
+        amount: 68.40,
+        type: 'expense',
+        category: 'Groceries',
+        merchant: "Trader Joe's Market",
+        note: 'Weekly fresh groceries',
+        accountId: newAccount.id,
+        autoCategorized: true
+      },
+      status: 'pending',
+      safetyLevel: 'low_risk',
+      confidenceScore: 0.98
+    });
+
+    const plan: AgentTaskPlan = {
+      id: `plan_populate_${timestamp}`,
+      intent: 'BATCH_POPULATE_FINANCES',
+      confidence: 0.99,
+      reasoning: 'Constructed synchronized multi-action batch to seed wallet, envelopes, bills, and transactions.',
+      steps: [
+        { step: 1, title: 'Seed Wallet Entity', detail: 'Physical Cash & Digital Wallet ($350.00)', status: 'completed' },
+        { step: 2, title: 'Calibrate Budget Envelopes', detail: 'Groceries ($450) & Dining ($240)', status: 'completed' },
+        { step: 3, title: 'Schedule Recurring Obligations', detail: 'Netflix ($15.99) & City Electric ($84.50)', status: 'completed' },
+        { step: 4, title: 'Seed Ledger Transactions', detail: "Trader Joe's ($68.40) mapped to wallet", status: 'completed' }
+      ]
+    };
+
+    return {
+      content: `I've prepared a complete set of **${actionsToStack.length} synchronized actions** to populate your wallet, budget envelopes, recurring bills, and transactions with realistic initial data.\n\nAll ${actionsToStack.length} proposals are stacked up in the Execution Gate below. You can confirm and execute them individually or tap **Execute All** to commit the entire bundle at once!`,
+      measurableValue: `${actionsToStack.length} Financial Actions Stacked`,
+      plan,
+      action: actionsToStack[0],
+      actions: actionsToStack
+    };
+  }
 
   // 1. INTENT: CASH RUNWAY QUERY
   if (lower.includes('runway') || lower.includes('how long can i survive') || lower.includes('survival')) {
@@ -1096,6 +1806,81 @@ export function parseAgentResponseWithActions(
         const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
         return { content: cleanContent, plan, action, measurableValue: desc };
       }
+
+      // 14. Delete Transaction proposal
+      if (parsed && parsed.action === 'DELETE_TRANSACTION') {
+        const txId = parsed.transactionId || parsed.id;
+        const target = context.transactions.find(t => t.id === txId) || context.transactions.find(t => t.merchant.toLowerCase().includes(String(parsed.merchant || '').toLowerCase()));
+        if (target) {
+          const action: AgentAction = {
+            id: `act_del_tx_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'DELETE_TRANSACTION',
+            description: `Delete transaction: ${target.merchant} ($${target.amount.toFixed(2)}) from ${target.date}`,
+            payload: target,
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_del_tx_${Date.now()}`,
+            intent: 'DELETE_TRANSACTION',
+            confidence: 0.98,
+            reasoning: `Prepared transaction deletion for ${target.merchant}.`,
+            steps: [
+              { step: 1, title: 'Locate Transaction', detail: `${target.merchant} ($${target.amount.toFixed(2)})`, status: 'completed' },
+              { step: 2, title: 'Verify Balance Remap', detail: 'Account balance will be restored', status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, measurableValue: `Delete tx: ${target.merchant}` };
+        }
+      }
+
+      // 15. Edit Transaction proposal
+      if (parsed && (parsed.action === 'EDIT_TRANSACTION' || parsed.action === 'UPDATE_TRANSACTION')) {
+        const txId = parsed.transactionId || parsed.id;
+        const target = context.transactions.find(t => t.id === txId) || context.transactions.find(t => t.merchant.toLowerCase().includes(String(parsed.merchant || '').toLowerCase())) || context.transactions[0];
+        if (target) {
+          const updates: Partial<Transaction> = {};
+          if (typeof parsed.amount === 'number') updates.amount = Math.abs(parsed.amount);
+          if (parsed.merchant) updates.merchant = parsed.merchant;
+          if (parsed.category) updates.category = parsed.category;
+          if (parsed.note) updates.note = parsed.note;
+          if (parsed.date) updates.date = parsed.date;
+
+          const action: AgentAction = {
+            id: `act_edit_tx_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            type: 'EDIT_TRANSACTION',
+            description: `Update transaction "${target.merchant}" amount/details`,
+            payload: { id: target.id, updates, previous: target },
+            status: 'pending',
+            safetyLevel: 'low_risk',
+            confidenceScore: 0.98
+          };
+
+          const plan: AgentTaskPlan = {
+            id: `plan_edit_tx_${Date.now()}`,
+            intent: 'EDIT_TRANSACTION',
+            confidence: 0.98,
+            reasoning: `Prepared transaction update for ${target.merchant}.`,
+            steps: [
+              { step: 1, title: 'Locate Transaction', detail: `${target.merchant} (${target.id})`, status: 'completed' },
+              { step: 2, title: 'Apply Field Modifications', detail: JSON.stringify(updates), status: 'completed' },
+              { step: 3, title: 'Await Confirmation', detail: 'Safe Execution Gate', status: 'in_progress' }
+            ],
+            proposedAction: action
+          };
+
+          const cleanContent = rawReply.replace(/```action_json\s*[\s\S]*?\s*```/, '').trim();
+          return { content: cleanContent, plan, action, measurableValue: `Update tx: ${target.merchant}` };
+        }
+      }
     } catch (e) {
       console.warn('Action JSON parsing warning:', e);
     }
@@ -1126,7 +1911,7 @@ export async function processAgentMessage(
     console.warn('[VectorDB] Sync notice:', syncErr);
   }
 
-  // Check if edge cognition determined a preliminary transaction or query plan
+  // Check if edge cognition determined a definitive transaction, query, or settings plan
   const edgePlan = runEdgeCognition(userInput, context);
 
   // Helper to stream text word-by-word if needed
@@ -1142,6 +1927,14 @@ export async function processAgentMessage(
       }
     }
   };
+
+  // If edge cognition determined a definitive transaction, query, or settings plan, return immediately
+  if (edgePlan.plan || edgePlan.action) {
+    if (onChunk && edgePlan.content) {
+      await streamFallbackText(edgePlan.content);
+    }
+    return edgePlan;
+  }
 
   // 1. Retrieve top semantically relevant chunks from local browser vector database
   const ragContext = vectorDb.buildRagContext(userInput, 4);
@@ -1180,21 +1973,29 @@ LIQUIDITY & BUDGET SUMMARY:
 CORE PERSONALITY & COMMUNICATION GUIDELINES:
 1. ACT LIKE A GENUINE INTELLIGENT PERSONAL SECRETARY (FIONA):
    - Be warm, attentive, conversational, witty, and helpful. You are a trusted human-like confidante, NOT a rigid corporate template or robot.
-   - For generic questions, general queries, small talk, questions about institutions, universities (e.g. "do you know about BRAC university?"), science, geography, culture, history, programming, writing, or general advice:
+   - For generic questions, general queries, small talk, questions about institutions, universities, science, geography, culture, history, programming, writing, or general advice:
      ANSWER DIRECTLY, KNOWLEDGEABLY, ACCURATELY, AND THOROUGHLY as Fiona. Do NOT deflect, do NOT give canned account status summaries, and do NOT force the conversation back to bank balances when the user is asking about an external topic.
    - For simple greetings and casual banter ("hey", "how are you?", "hello"), reply in 1 to 2 warm, natural sentences.
 
-2. AUTONOMOUS ACCOUNT & LEDGER OPERATIONS:
-   - You must evaluate whether the user's message is an instruction to OPERATE on their accounts or ledger data (e.g., logging income, recording an expense, transferring money, creating a crypto wallet, setting up an unbanked cash account, scheduling a bill, or saving a memory rule).
-   - If they ARE asking to operate on accounts or data, decide which account to operate on based on the context:
-     * Cash account: for physical cash, cash found, cash pocket, cash payments without a bank (e.g. acc_cash_01).
-     * Crypto wallet: for crypto tokens, web3, ETH, BTC, SOL, hardware wallets, on-chain transfers (e.g. acc_crypto_03).
-     * Bank checking, savings, credit cards, or investments: for their respective accounts.
-     * New Account Creation: If the user asks to add an account (e.g. "Add a crypto wallet for Phantom", "Create a cash jar account with $50", "Add my Chase savings"):
-       Emit an ADD_ACCOUNT action!
-     * When proposing an operation, explain what you are doing in your response, and append this exact action_json block at the very end:
+2. READING & AUDITING LEDGER DATA (READ OPERATIONS):
+   - If the user asks to read, check, or audit ANY section (e.g., "what are my current balances from all my accounts?", "do i have any upcoming bills?", "what do you know about me so far?", "show my budgets", "what are my recent transactions?"):
+     Answer directly, clearly, and accurately using the accounts, bills, budgets, and memory files provided above.
+     DO NOT output any action_json block for read-only questions!
 
-   For Transactions:
+3. AUTONOMOUS MUTATIONS ACROSS ALL SECTIONS (CREATE, UPDATE, DELETE):
+   - You have full capability to mutate, update, or remove entries when the user instructs you to.
+   - When proposing an operation, explain what you are doing warmly in your response, and append this exact action_json block at the very end:
+
+   For Updating Settings / Theme (e.g. "set theme to light mode", "switch theme", "mute voice"):
+\`\`\`action_json
+{
+  "action": "UPDATE_SETTINGS",
+  "theme": "light" | "dark",
+  "isSpeechEnabled": boolean
+}
+\`\`\`
+
+   For Transactions (Logging new spend or income):
 \`\`\`action_json
 {
   "action": "ADD_TRANSACTION",
@@ -1209,7 +2010,27 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 }
 \`\`\`
 
-   For Creating Accounts (Crypto wallet, Cash account, Bank account, etc.):
+   For Editing a Transaction:
+\`\`\`action_json
+{
+  "action": "EDIT_TRANSACTION",
+  "transactionId": "string",
+  "amount": number,
+  "merchant": "string",
+  "category": "string"
+}
+\`\`\`
+
+   For Deleting a Transaction:
+\`\`\`action_json
+{
+  "action": "DELETE_TRANSACTION",
+  "transactionId": "string",
+  "merchant": "string"
+}
+\`\`\`
+
+   For Creating Accounts (ONLY when user explicitly requests adding a new account/wallet):
 \`\`\`action_json
 {
   "action": "ADD_ACCOUNT",
@@ -1217,9 +2038,27 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
   "type": "cash" | "crypto" | "checking" | "savings" | "credit" | "investment",
   "balance": number,
   "currency": "USD",
-  "institution": "string (leave empty string \"\" for cash accounts with no bank specified, or specify bank/wallet e.g. MetaMask, Chase)",
-  "network": "string (optional for crypto e.g. Solana, Ethereum, Bitcoin)",
-  "walletAddress": "string (optional for crypto e.g. 0x...)"
+  "institution": "string",
+  "network": "string (optional for crypto)",
+  "walletAddress": "string (optional for crypto)"
+}
+\`\`\`
+
+   For Updating an Account Balance or Name:
+\`\`\`action_json
+{
+  "action": "EDIT_ACCOUNT",
+  "accountId": "string",
+  "balance": number,
+  "name": "string"
+}
+\`\`\`
+
+   For Deleting an Account:
+\`\`\`action_json
+{
+  "action": "DELETE_ACCOUNT",
+  "accountId": "string"
 }
 \`\`\`
 
@@ -1235,6 +2074,30 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
 }
 \`\`\`
 
+   For Paying or Deleting Bills:
+\`\`\`action_json
+{
+  "action": "PAY_BILL",
+  "billId": "string"
+}
+\`\`\`
+   or:
+\`\`\`action_json
+{
+  "action": "DELETE_BILL",
+  "billId": "string"
+}
+\`\`\`
+
+   For Updating Budget Envelopes:
+\`\`\`action_json
+{
+  "action": "UPDATE_BUDGET",
+  "category": "string",
+  "allocated": number
+}
+\`\`\`
+
    For Memory Rules:
 \`\`\`action_json
 {
@@ -1242,9 +2105,18 @@ CORE PERSONALITY & COMMUNICATION GUIDELINES:
   "rule": "string"
 }
 \`\`\`
+   or:
+\`\`\`action_json
+{
+  "action": "DELETE_MEMORY_RULE",
+  "rule": "string"
+}
+\`\`\`
 
-3. CRITICAL: NO ACTION FOR NON-TRANSACTIONAL QUERIES:
-   - If the user is asking a general knowledge question, learning something, asking about a university, discussing hypothetical math, or chatting without requesting a financial transaction, DO NOT output any action_json block.`;
+4. CRITICAL: STRICT DISCIPLINE & NO HALLUCINATIONS:
+   - NEVER assume the user wants to open an account when they talk about themes, display mode, settings, questions, or other topics!
+   - DO NOT hallucinate account creation: NEVER say "The user is seeking to open a new account, creating a new wallet, and creating a bank account."
+   - If the user asks a question, gives advice, or chats without asking for a mutation, DO NOT output any action_json block.`;
 
   // If local edge engine (Chrome Prompt API / Transformers.js) is explicitly active, try it first
   if (config.provider === 'edge') {

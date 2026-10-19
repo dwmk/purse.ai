@@ -127,6 +127,7 @@ export interface ChatMessage {
   timestamp: string;
   plan?: AgentTaskPlan;
   action?: AgentAction;
+  actions?: AgentAction[];
   memoryUpdateNote?: string;
 }
 
@@ -159,12 +160,23 @@ export interface MemoryFile {
   revisionCount: number;
 }
 
-export type LLMProvider = 'edge' | 'gemini' | 'openai' | 'deepseek' | 'zai' | 'custom';
+export type LLMProvider =
+  | 'edge'
+  | 'gemini'
+  | 'openai'
+  | 'deepseek'
+  | 'zai'
+  | 'claude'
+  | 'qwen'
+  | 'groq'
+  | 'huggingface'
+  | 'custom';
 
 export interface LLMConfig {
   provider: LLMProvider;
   apiKey?: string;
   model?: string;
+  apiKeys?: Partial<Record<LLMProvider, string>>;
   customBaseUrl?: string;
   useEdgeFallback: boolean;
   autoApproveSafeActions: boolean;

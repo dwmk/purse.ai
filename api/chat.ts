@@ -273,6 +273,146 @@ export default async function handler(req: any, res: any) {
       return res.json({ reply, provider: 'zai', model: model || 'glm-4-flash' });
     }
 
+    // 5. CLAUDE (ANTHROPIC) PROVIDER
+    if (provider === 'claude') {
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Claude API Key is required for Anthropic Claude provider' });
+      }
+
+      const claudeMessages = messages.map((m: any) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content
+      }));
+
+      const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: model || 'claude-3-5-sonnet-20241022',
+          system: systemInstruction || undefined,
+          messages: claudeMessages,
+          max_tokens: 1500,
+          temperature
+        })
+      });
+
+      if (!claudeRes.ok) {
+        const errText = await claudeRes.text();
+        return res.status(claudeRes.status).json({ error: `Claude API error: ${errText}` });
+      }
+
+      const data: any = await claudeRes.json();
+      const reply = data.content?.map((c: any) => c.text || '').join('') || '';
+      return res.json({ reply, provider: 'claude', model: model || 'claude-3-5-sonnet-20241022' });
+    }
+
+    // 6. QWEN (ALIBABA DASHSCOPE) PROVIDER
+    if (provider === 'qwen') {
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Qwen API Key is required for Alibaba Qwen provider' });
+      }
+
+      const qwenMessages = [
+        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+        ...messages
+      ];
+
+      const qwenRes = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model || 'qwen-turbo',
+          messages: qwenMessages,
+          temperature
+        })
+      });
+
+      if (!qwenRes.ok) {
+        const errText = await qwenRes.text();
+        return res.status(qwenRes.status).json({ error: `Qwen API error: ${errText}` });
+      }
+
+      const data: any = await qwenRes.json();
+      const reply = data.choices?.[0]?.message?.content || '';
+      return res.json({ reply, provider: 'qwen', model: model || 'qwen-turbo' });
+    }
+
+    // 7. GROQ PROVIDER
+    if (provider === 'groq') {
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Groq API Key is required for Groq provider' });
+      }
+
+      const groqMessages = [
+        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+        ...messages
+      ];
+
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model || 'llama-3.3-70b-versatile',
+          messages: groqMessages,
+          temperature
+        })
+      });
+
+      if (!groqRes.ok) {
+        const errText = await groqRes.text();
+        return res.status(groqRes.status).json({ error: `Groq API error: ${errText}` });
+      }
+
+      const data: any = await groqRes.json();
+      const reply = data.choices?.[0]?.message?.content || '';
+      return res.json({ reply, provider: 'groq', model: model || 'llama-3.3-70b-versatile' });
+    }
+
+    // 8. HUGGING FACE INFERENCE ROUTER PROVIDER
+    if (provider === 'huggingface') {
+      if (!apiKey) {
+        return res.status(400).json({ error: 'Hugging Face API Token is required for Hugging Face provider' });
+      }
+
+      const hfMessages = [
+        ...(systemInstruction ? [{ role: 'system', content: systemInstruction }] : []),
+        ...messages
+      ];
+
+      const hfRes = await fetch('https://router.huggingface.co/hf-inference/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: model || 'meta-llama/Llama-3.1-70B-Instruct',
+          messages: hfMessages,
+          max_tokens: 1500,
+          temperature
+        })
+      });
+
+      if (!hfRes.ok) {
+        const errText = await hfRes.text();
+        return res.status(hfRes.status).json({ error: `Hugging Face API error: ${errText}` });
+      }
+
+      const data: any = await hfRes.json();
+      const reply = data.choices?.[0]?.message?.content || '';
+      return res.json({ reply, provider: 'huggingface', model: model || 'meta-llama/Llama-3.1-70B-Instruct' });
+    }
+
     return res.status(400).json({ error: `Unsupported provider: ${provider}` });
   } catch (err: unknown) {
     const error = err as Error;

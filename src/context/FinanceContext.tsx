@@ -568,6 +568,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAccounts(updatedAccounts);
       StorageService.saveAccounts(updatedAccounts);
       showNotification('success', `Created ${newAcc.type.toUpperCase()} account "${newAcc.name}".`);
+    } else if (action.type === 'EDIT_ACCOUNT') {
+      const { id, updates } = action.payload;
+      const updatedAccounts = accounts.map(a => a.id === id ? { ...a, ...updates, lastUpdated: new Date().toISOString() } : a);
+      setAccounts(updatedAccounts);
+      StorageService.saveAccounts(updatedAccounts);
+      showNotification('success', `Updated account details.`);
+    } else if (action.type === 'DELETE_ACCOUNT') {
+      const target: Account = action.payload;
+      const remainingAccounts = accounts.filter(a => a.id !== target.id);
+      setAccounts(remainingAccounts);
+      StorageService.saveAccounts(remainingAccounts);
+      const fallbackId = remainingAccounts[0]?.id || 'acc_primary_01';
+      const remappedTxs = transactions.map(t => t.accountId === target.id ? { ...t, accountId: fallbackId } : t);
+      setTransactions(remappedTxs);
+      StorageService.saveTransactions(remappedTxs);
+      showNotification('success', `Deleted account "${target.name}".`);
     } else if (action.type === 'ADD_TRANSACTION') {
       const newTx: Transaction = action.payload;
       const updatedTxs = [newTx, ...transactions];
@@ -600,17 +616,104 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         StorageService.saveAccounts(updatedAccounts);
       }
       showNotification('success', `Logged ${newTx.type} of $${newTx.amount.toFixed(2)}.`);
+    } else if (action.type === 'EDIT_TRANSACTION') {
+      const { id, updates, previous } = action.payload;
+      const updatedTxs = transactions.map(t => t.id === id ? { ...t, ...updates } : t);
+      setTransactions(updatedTxs);
+      StorageService.saveTransactions(updatedTxs);
+
+      if (typeof updates.amount === 'number' && previous) {
+        const oldAmt = previous.amount;
+        const newAmt = updates.amount;
+        const isIncome = (updates.type || previous.type) === 'income';
+        const delta = isIncome ? (newAmt - oldAmt) : (oldAmt - newAmt);
+        const targetAccId = updates.accountId || previous.accountId;
+        const updatedAccounts = accounts.map(acc =>
+          acc.id === targetAccId ? { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() } : acc
+        );
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+      }
+      showNotification('success', `Updated transaction.`);
+    } else if (action.type === 'DELETE_TRANSACTION') {
+      const tx: Transaction = action.payload;
+      const remainingTxs = transactions.filter(t => t.id !== tx.id);
+      setTransactions(remainingTxs);
+      StorageService.saveTransactions(remainingTxs);
+
+      const delta = tx.type === 'income' ? -tx.amount : tx.amount;
+      const updatedAccounts = accounts.map(acc =>
+        acc.id === tx.accountId ? { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() } : acc
+      );
+      setAccounts(updatedAccounts);
+      StorageService.saveAccounts(updatedAccounts);
+      showNotification('success', `Deleted transaction for ${tx.merchant}.`);
     } else if (action.type === 'ADD_BILL') {
       const newBill: Bill = action.payload;
       const updatedBills = [...bills, newBill];
       setBills(updatedBills);
       StorageService.saveBills(updatedBills);
       showNotification('success', `Scheduled bill ${newBill.name} ($${newBill.amount.toFixed(2)}).`);
-    } else if (action.type === 'UPDATE_MEMORY') {
+    } else if (action.type === 'EDIT_BILL' || action.type === 'PAY_BILL') {
+      const { id, updates } = action.payload;
+      const updatedBills = bills.map(b => b.id === id ? { ...b, ...updates } : b);
+      setBills(updatedBills);
+      StorageService.saveBills(updatedBills);
+      showNotification('success', action.type === 'PAY_BILL' ? `Marked bill as paid.` : `Updated recurring bill.`);
+    } else if (action.type === 'DELETE_BILL') {
+      const bill: Bill = action.payload;
+      const remainingBills = bills.filter(b => b.id !== bill.id);
+      setBills(remainingBills);
+      StorageService.saveBills(remainingBills);
+      showNotification('success', `Deleted bill "${bill.name}".`);
+    } else if (action.type === 'UPDATE_BUDGET') {
+      const { id, category, allocated } = action.payload;
+      const updatedBudgets = budgets.map(b =>
+        (b.id === id || b.category.toLowerCase() === (category || '').toLowerCase()) ? { ...b, allocated } : b
+      );
+      setBudgets(updatedBudgets);
+      StorageService.saveBudgets(updatedBudgets);
+      showNotification('success', `Updated ${category} budget to $${allocated.toFixed(2)}/mo.`);
+    } else if (action.type === 'ADD_BUDGET') {
+      const newBud = action.payload;
+      const updatedBudgets = [...budgets, newBud];
+      setBudgets(updatedBudgets);
+      StorageService.saveBudgets(updatedBudgets);
+      showNotification('success', `Added budget envelope "${newBud.category}".`);
+    } else if (action.type === 'DELETE_BUDGET') {
+      const budget = action.payload;
+      const remainingBudgets = budgets.filter(b => b.id !== budget.id);
+      setBudgets(remainingBudgets);
+      StorageService.saveBudgets(remainingBudgets);
+      showNotification('success', `Removed budget envelope "${budget.category}".`);
+    } else if (action.type === 'UPDATE_MEMORY' || action.type === 'DELETE_MEMORY_RULE') {
       const updatedMem: MemoryFile = action.payload;
       setMemory(updatedMem);
       StorageService.saveMemory(updatedMem);
       showNotification('success', `Committed Revision #${updatedMem.revisionCount} to Memory.`);
+    } else if (action.type === 'UPDATE_SETTINGS') {
+      const payload = action.payload || {};
+      if (payload.theme) {
+        setTheme(payload.theme);
+        StorageService.saveTheme(payload.theme);
+        if (typeof document !== 'undefined') {
+          if (payload.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        }
+      }
+      if (payload.isSpeechEnabled !== undefined) {
+        setIsSpeechEnabled(payload.isSpeechEnabled);
+        StorageService.saveSpeechEnabled(payload.isSpeechEnabled);
+      }
+      if (payload.provider) {
+        const nextCfg = { ...config, provider: payload.provider, model: payload.model || config.model };
+        setConfig(nextCfg);
+        StorageService.saveConfig(nextCfg);
+      }
+      showNotification('success', action.description || 'Settings updated.');
     }
 
     const updatedActions = actions.map(a => (a.id === actionId ? { ...a, status: 'applied' as const } : a));
@@ -658,6 +761,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setAccounts(updatedAccounts);
       StorageService.saveAccounts(updatedAccounts);
       showNotification('success', `Reverted creation of account "${acc.name}".`);
+    } else if (action.type === 'EDIT_ACCOUNT') {
+      const { id, previous } = action.payload;
+      if (previous) {
+        const updatedAccounts = accounts.map(a => a.id === id ? previous : a);
+        setAccounts(updatedAccounts);
+        StorageService.saveAccounts(updatedAccounts);
+        showNotification('success', `Reverted account updates.`);
+      }
+    } else if (action.type === 'DELETE_ACCOUNT') {
+      const target: Account = action.payload;
+      const restored = [...accounts, target];
+      setAccounts(restored);
+      StorageService.saveAccounts(restored);
+      showNotification('success', `Restored account "${target.name}".`);
     } else if (action.type === 'ADD_TRANSACTION') {
       const tx: Transaction = action.payload;
       const updatedTxs = transactions.filter(t => t.id !== tx.id);
@@ -690,12 +807,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         StorageService.saveAccounts(updatedAccounts);
       }
       showNotification('success', `Reverted $${tx.amount.toFixed(2)} transaction.`);
+    } else if (action.type === 'EDIT_TRANSACTION') {
+      const { id, previous, updates } = action.payload;
+      if (previous) {
+        const updatedTxs = transactions.map(t => t.id === id ? previous : t);
+        setTransactions(updatedTxs);
+        StorageService.saveTransactions(updatedTxs);
+
+        if (typeof updates.amount === 'number') {
+          const oldAmt = previous.amount;
+          const newAmt = updates.amount;
+          const isIncome = (updates.type || previous.type) === 'income';
+          const delta = isIncome ? (oldAmt - newAmt) : (newAmt - oldAmt);
+          const targetAccId = updates.accountId || previous.accountId;
+          const updatedAccounts = accounts.map(acc =>
+            acc.id === targetAccId ? { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() } : acc
+          );
+          setAccounts(updatedAccounts);
+          StorageService.saveAccounts(updatedAccounts);
+        }
+        showNotification('success', `Reverted transaction edits.`);
+      }
+    } else if (action.type === 'DELETE_TRANSACTION') {
+      const tx: Transaction = action.payload;
+      const restoredTxs = [tx, ...transactions];
+      setTransactions(restoredTxs);
+      StorageService.saveTransactions(restoredTxs);
+
+      const delta = tx.type === 'income' ? tx.amount : -tx.amount;
+      const updatedAccounts = accounts.map(acc =>
+        acc.id === tx.accountId ? { ...acc, balance: acc.balance + delta, lastUpdated: new Date().toISOString() } : acc
+      );
+      setAccounts(updatedAccounts);
+      StorageService.saveAccounts(updatedAccounts);
+      showNotification('success', `Restored transaction for ${tx.merchant}.`);
     } else if (action.type === 'ADD_BILL') {
       const bill: Bill = action.payload;
       const updatedBills = bills.filter(b => b.id !== bill.id);
       setBills(updatedBills);
       StorageService.saveBills(updatedBills);
       showNotification('success', `Removed bill ${bill.name}.`);
+    } else if (action.type === 'EDIT_BILL' || action.type === 'PAY_BILL') {
+      const { id, previous } = action.payload;
+      if (previous) {
+        const updatedBills = bills.map(b => b.id === id ? previous : b);
+        setBills(updatedBills);
+        StorageService.saveBills(updatedBills);
+        showNotification('success', `Reverted bill modifications.`);
+      }
+    } else if (action.type === 'DELETE_BILL') {
+      const bill: Bill = action.payload;
+      const restored = [...bills, bill];
+      setBills(restored);
+      StorageService.saveBills(restored);
+      showNotification('success', `Restored bill "${bill.name}".`);
+    } else if (action.type === 'UPDATE_BUDGET') {
+      const { id, category, previousAllocated } = action.payload;
+      if (typeof previousAllocated === 'number') {
+        const updatedBudgets = budgets.map(b =>
+          (b.id === id || b.category.toLowerCase() === (category || '').toLowerCase()) ? { ...b, allocated: previousAllocated } : b
+        );
+        setBudgets(updatedBudgets);
+        StorageService.saveBudgets(updatedBudgets);
+        showNotification('success', `Reverted budget for ${category}.`);
+      }
     }
 
     const updatedActions = actions.map(a => (a.id === actionId ? { ...a, status: 'reverted' as const } : a));
@@ -832,10 +1007,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setActions(nextActions);
         StorageService.saveActions(nextActions);
 
-        if (config.autoApproveSafeActions && response.action.safetyLevel === 'low_risk') {
+        // Immediately apply UPDATE_SETTINGS (e.g. theme switch, voice mute) or auto-approved low-risk actions
+        if (response.action.type === 'UPDATE_SETTINGS' || (config.autoApproveSafeActions && response.action.safetyLevel === 'low_risk')) {
           setTimeout(() => {
             if (response.action) applyAction(response.action.id);
-          }, 300);
+          }, 150);
         }
       }
 

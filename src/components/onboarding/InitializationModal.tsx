@@ -616,6 +616,39 @@ export const InitializationModal: React.FC<InitializationModalProps> = ({
                 </div>
               </div>
 
+              {/* Detected Accounts Breakdown with Smart Assignment */}
+              <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-850 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400 flex items-center justify-between">
+                  <span>Smart Account Segregation ({organizedResult.accounts.length})</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">SMART ASSIGNMENT ACTIVE</span>
+                </div>
+                <div className="p-2.5 divide-y divide-zinc-200/50 dark:divide-zinc-800/50 font-mono text-xs space-y-2">
+                  {organizedResult.accounts.map(acc => {
+                    const assignedCount = organizedResult.transactions.filter(t => t.accountId === acc.id).length;
+                    return (
+                      <div key={acc.id} className="pt-2 first:pt-0 flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5 truncate">
+                            <span>{acc.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-full uppercase font-bold bg-violet-100 dark:bg-violet-950/80 text-violet-700 dark:text-violet-300">
+                              {acc.type}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-zinc-500 truncate">
+                            {acc.institution || 'No bank specified'} · {assignedCount} transactions assigned
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-bold text-xs tabular-nums text-zinc-900 dark:text-zinc-100">
+                            ${acc.balance.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Transaction Preview Table */}
               <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden">
                 <div className="px-3.5 py-2 bg-zinc-100 dark:bg-zinc-850 font-mono text-[10px] font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
