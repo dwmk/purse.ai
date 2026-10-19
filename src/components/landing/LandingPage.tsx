@@ -271,11 +271,11 @@ footer{border-top:1px solid var(--line);padding:2rem 0;color:var(--mute);font-si
 <div class="pts" style="margin-top:3rem">
 <div><h3>Meet Fiona</h3><p>A 3D companion who listens, talks back and lip-syncs, so checking your budget feels like chatting with a friend.</p></div>
 <div><h3>It remembers</h3><p>Rules like “keep dining under $95 a week” live in a plain Markdown file you can read and edit.</p></div>
-<div><h3>Open source</h3><p>MIT licensed and built for the 2026 Shenzhen International FinTech Competition.</p></div>
+<div><h3>Open source</h3><p>Licensed and built for the 2026 Shenzhen International FinTech Competition.</p></div>
 </div>
 </div></section>
 
-<footer><div class="wrap">Purse Finance · 8th Fintechathon 2026</div></footer>` }} />
+<footer><div class="wrap">Purse Finance · Awesome Ice Cream · 8th Fintechathon 2026</div></footer>` }} />
     </div>
   );
 };

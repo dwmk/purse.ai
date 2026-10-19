@@ -28,14 +28,30 @@ interface InitializationModalProps {
   canCancel?: boolean;
 }
 
-const SAMPLE_CSV = `Date,Amount,Type,Merchant,Category,Notes
-2026-10-10,3200.00,income,Employer Payroll,Income,Semi-monthly salary deposit
-2026-10-11,1450.00,expense,Avalon Bay Properties,Housing & Rent,October rent
-2026-10-12,84.50,expense,Trader Joe's,Groceries,Weekly grocery stock
-2026-10-13,15.99,expense,Netflix,Subscriptions & Software,Monthly streaming
-2026-10-14,48.20,expense,Chevron Fuel,Transportation & Fuel,Gas refill
-2026-10-15,62.00,expense,Blue Bottle Coffee,Dining & Nightlife,Team coffee
-2026-10-16,35.00,expense,CVS Pharmacy,Health & Wellness,Prescription
+const SAMPLE_CSV = `Date,Amount,Type,Merchant,Category,Account,Notes
+2026-10-01,1850.00,expense,Metropolitan Property Mgmt,Housing & Rent,Primary Checking (Chase ••••4192),October apartment lease rent autopay
+2026-10-02,19.50,expense,Blue Bottle Coffee,Dining & Nightlife,Daily Rewards Credit Card (••••1044),Single origin pour-over & pastry
+2026-10-03,89.40,expense,Whole Foods Market,Groceries,Daily Rewards Credit Card (••••1044),Fresh organic groceries and produce
+2026-10-04,600.00,transfer,Marcus High-Yield Vault,Savings & Investments,Primary Checking (Chase ••••4192),Monthly automated emergency vault savings
+2026-10-05,22.00,expense,GitHub Copilot Pro,Subscriptions & Software,Daily Rewards Credit Card (••••1044),Monthly developer AI assistant
+2026-10-06,14.50,expense,Local Farmers Market,Groceries,Physical Cash Wallet,Fresh sourdough loaf and berries
+2026-10-08,34.00,expense,Equinox Fitness / ClassPass,Health & Wellness,Daily Rewards Credit Card (••••1044),Monthly fitness gym access
+2026-10-10,3150.00,income,Stripe Engineering Payout,Other,Primary Checking (Chase ••••4192),Semi-monthly salary direct deposit
+2026-10-11,79.99,expense,Spectrum Fiber Internet,Utilities & Services,Primary Checking (Chase ••••4192),Gigabit home fiber internet autopay
+2026-10-12,118.60,expense,Trader Joe's,Groceries,Daily Rewards Credit Card (••••1044),Weekly pantry restock and dry goods
+2026-10-13,15.99,expense,Netflix Standard HD,Subscriptions & Software,Daily Rewards Credit Card (••••1044),Monthly media streaming subscription
+2026-10-14,64.20,expense,Chevron Fuel Station,Transportation & Fuel,Daily Rewards Credit Card (••••1044),Premium fuel tank fill-up
+2026-10-15,48.50,expense,Ramen Tatsu-Ya,Dining & Nightlife,Daily Rewards Credit Card (••••1044),Dinner with coworkers
+2026-10-16,135.40,expense,City Electric & Power Co.,Utilities & Services,Primary Checking (Chase ••••4192),Monthly electricity meter bill
+2026-10-17,42.00,expense,CVS Pharmacy Care,Health & Wellness,Daily Rewards Credit Card (••••1044),Prescription refill and wellness items
+2026-10-18,142.00,expense,GEICO Auto Insurance,Transportation & Fuel,Primary Checking (Chase ••••4192),Monthly comprehensive auto policy
+2026-10-19,38.00,expense,Alamo Drafthouse Cinema,Entertainment & Leisure,Daily Rewards Credit Card (••••1044),Weekend movie tickets and snacks
+2026-10-20,12.99,expense,Spotify Premium Duo,Subscriptions & Software,Daily Rewards Credit Card (••••1044),Monthly audio streaming family tier
+2026-10-21,85.00,expense,Amazon Prime Essentials,Shopping & Goods,Daily Rewards Credit Card (••••1044),Home desk organizer and cables
+2026-10-22,25.00,expense,Downtown Parking Garage,Transportation & Fuel,Physical Cash Wallet,Weekend event parking cash ticket
+2026-10-23,250.00,income,Solana Validator Rewards,Other,Web3 Crypto Wallet (0x71C8...3A9F),Staking yield payout
+2026-10-24,20.00,expense,Neighborhood Taco Stand,Dining & Nightlife,Physical Cash Wallet,Lunch street tacos with cash tip
+2026-10-25,3150.00,income,Stripe Engineering Payout,Other,Primary Checking (Chase ••••4192),End-of-month salary direct deposit
 `;
 
 export const InitializationModal: React.FC<InitializationModalProps> = ({
