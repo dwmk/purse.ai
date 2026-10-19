@@ -3,7 +3,7 @@
 **Version:** 2.4.0  
 **Product Lead:** Autonomous Finance Core Team  
 **Status:** Approved & Implemented  
-**Reference Repo:** `kdue/purse.ai`
+**Reference Repo:** `dwmk/purse.ai`
 
 ---
 

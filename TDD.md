@@ -3,7 +3,7 @@
 **Version:** 2.4.0  
 **Status:** Production  
 **Target Environment:** AI Studio Edge Runtime & Modern Web Browsers  
-**Repository Source:** Imported from `kdue/purse.ai`
+**Repository Source:** Imported from `dwmk/purse.ai`
 
 ---
 
