@@ -51,7 +51,7 @@ export const TopBar: React.FC = () => {
             onClick={toggleSidebar}
             title="Toggle Conversation History"
             aria-label="Toggle Conversation History"
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors sm:hidden"
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors"
           >
             <PanelLeft className="w-4 h-4" />
           </button>
