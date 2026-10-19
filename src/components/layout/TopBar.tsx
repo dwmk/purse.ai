@@ -47,6 +47,7 @@ export const TopBar: React.FC = () => {
         {/* Left Side: Purse Wordmark & Brand Logo + Mobile Sidebar Toggle */}
         <div className="flex items-center gap-2.5 shrink-0">
 
+        {!isLanding && (
           <button
             onClick={toggleSidebar}
             title="Toggle Conversation History"
@@ -55,7 +56,7 @@ export const TopBar: React.FC = () => {
           >
             <PanelLeft className="w-4 h-4" />
           </button>
-          
+        )}
 
           <button
             onClick={() => {
