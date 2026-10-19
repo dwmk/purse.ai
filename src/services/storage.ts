@@ -775,7 +775,7 @@ export const StorageService = {
     const payload = {
       version: '2.1.0',
       exportedAt: new Date().toISOString(),
-      app: 'Purse Autonomous Finance',
+      app: 'Purse Personal Finance',
       accounts: this.getAccounts(),
       transactions: this.getTransactions(),
       bills: this.getBills(),

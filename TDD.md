@@ -1,5 +1,5 @@
 # Technical Design Document (TDD)
-## System: Purse Autonomous Finance
+## System: Purse Personal Finance
 **Version:** 2.4.0  
 **Status:** Production  
 **Target Environment:** AI Studio Edge Runtime & Modern Web Browsers  

@@ -63,7 +63,7 @@ export const TopBar: React.FC = () => {
               if (isLanding) window.history.pushState(null, '', '/');
             }}
             className="flex items-center gap-2.5 group cursor-pointer text-left"
-            title="Purse Autonomous Finance"
+            title="Purse Personal Finance"
           >
             <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-['Bricolage_Grotesque'] font-extrabold text-sm shadow-xs group-hover:scale-105 transition-transform ${
               isLanding

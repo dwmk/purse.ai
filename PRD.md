@@ -1,5 +1,5 @@
 # Product Requirements Document (PRD)
-## Product: Purse Autonomous Finance
+## Product: Purse Personal Finance
 **Version:** 2.4.0  
 **Product Lead:** Autonomous Finance Core Team  
 **Status:** Approved & Implemented  

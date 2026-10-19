@@ -14,7 +14,7 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'manifest.json'],
         manifest: {
           id: '/app',
-          name: 'Purse Autonomous Finance',
+          name: 'Purse Personal Finance',
           short_name: 'Purse',
           description: 'Purse - Decentralized edge-computing personal finance copilot with smart budgeting, voice interaction, and long-term memory.',
           theme_color: '#B59DD1',

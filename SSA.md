@@ -1,10 +1,10 @@
-# Security Self-Assessment Report: Purse Autonomous Finance (`Purse.ai`)
+# Security Self-Assessment Report: Purse Personal Finance (`Purse.ai`)
 
 ---
 
 ## 1. Executive Summary & Architecture Scope
 
-**Purse Autonomous Finance** is a decentralized, local-first personal finance copilot combining an Express.js server (AI proxy & static serving) with a client-side React 19 / TypeScript SPA.
+**Purse Personal Finance** is a decentralized, local-first personal finance copilot combining an Express.js server (AI proxy & static serving) with a client-side React 19 / TypeScript SPA.
 
 * **Runtime Context:** Node.js Express server (`server.ts`) on port 3000 + client-side Vite SPA.
 * **Data Flow Model:** All core ledger data (accounts, transactions, bills, budgets, behavioral rules, and financial profile memory) is persisted client-side in the user's browser, while AI reasoning is handled either 100% locally on-device (`SmolLM2-135M-Instruct-ONNX` via in-browser ONNX runtime) or proxied server-side to cloud models (Gemini, Claude, OpenAI, DeepSeek, Groq, etc.).
