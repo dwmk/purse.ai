@@ -425,8 +425,8 @@ export const FionaAvatar: React.FC = () => {
         }`}
         title={
           isChatView
-            ? 'Fiona 3D Companion · Drag to rotate (releases to center)'
-            : 'Fiona 3D Companion · Tap to return to Chat'
+            ? 'Fiona'
+            : 'Fiona'
         }
       >
         <div className={`relative flex items-center justify-center ${
@@ -470,14 +470,6 @@ export const FionaAvatar: React.FC = () => {
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>
-          )}
-
-          {/* Rotation Hint Overlay in Full View */}
-          {isVisible && isChatView && !isLoading && !hasError && (
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/85 dark:bg-zinc-900/85 border border-zinc-200 dark:border-zinc-800 text-[11px] font-mono text-zinc-600 dark:text-zinc-300 pointer-events-none shadow-sm flex items-center gap-1.5 opacity-80 backdrop-blur-xs">
-              <RotateCcw className="w-3 h-3 text-violet-500" />
-              <span>Drag to rotate · Releases to center</span>
-            </div>
           )}
         </div>
       </div>
