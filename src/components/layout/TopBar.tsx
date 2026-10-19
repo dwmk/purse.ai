@@ -42,20 +42,20 @@ export const TopBar: React.FC = () => {
         ? 'border-b border-[#D9D2F2]/70 dark:border-[#38295F]/70 bg-[#F4F1FF]/90 dark:bg-[#150F29]/90 backdrop-blur-md'
         : 'border-b border-zinc-200/80 dark:border-zinc-800/80 bg-white/85 dark:bg-[#0A0910]/85 backdrop-blur-md'
     }`}>
-      <div className={`${isLanding ? 'max-w-[1080px]' : 'max-w-7xl'} mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between gap-4`}>
+      <div className={`mx-auto px-4 sm:px-6 lg:px-8 h-15 flex items-center justify-between gap-4`}>
         
         {/* Left Side: Purse Wordmark & Brand Logo + Mobile Sidebar Toggle */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {!isLanding && (
-            <button
-              onClick={toggleSidebar}
-              title="Toggle Conversation History"
-              aria-label="Toggle Conversation History"
-              className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors sm:hidden"
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
-          )}
+
+          <button
+            onClick={toggleSidebar}
+            title="Toggle Conversation History"
+            aria-label="Toggle Conversation History"
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer transition-colors sm:hidden"
+          >
+            <PanelLeft className="w-4 h-4" />
+          </button>
+          
 
           <button
             onClick={() => {
